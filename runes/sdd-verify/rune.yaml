@@ -1,0 +1,16 @@
+name: sdd-verify
+version: 1.0.0
+description: "Validate that implementation matches specs, design, and tasks"
+author: Andragon
+tags: [sdd, verification, testing, validation]
+
+triggers:
+  commands: [sdd, verify, validation]
+  context: [sdd, testing, quality]
+
+execution:
+  type: prompt
+  sandbox: false
+
+outputs:
+  console: "Verification report with compliance matrix and pass/fail verdict"

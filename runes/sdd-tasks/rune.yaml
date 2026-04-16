@@ -1,0 +1,16 @@
+name: sdd-tasks
+version: 1.0.0
+description: "Break down a change into an implementation task checklist"
+author: Andragon
+tags: [sdd, tasks, implementation, breakdown]
+
+triggers:
+  commands: [sdd, tasks, breakdown]
+  context: [sdd, implementation, planning]
+
+execution:
+  type: prompt
+  sandbox: false
+
+outputs:
+  console: "Task breakdown created with phases and actionable items"

@@ -1,0 +1,16 @@
+name: sdd-apply
+version: 1.0.0
+description: "Implement tasks from the change, writing actual code following the specs and design"
+author: Andragon
+tags: [sdd, implementation, code, development]
+
+triggers:
+  commands: [sdd, apply, implement]
+  context: [sdd, implementation, coding]
+
+execution:
+  type: prompt
+  sandbox: false
+
+outputs:
+  console: "Implementation complete with marked tasks and apply-progress artifact"

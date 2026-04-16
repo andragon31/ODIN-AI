@@ -52,6 +52,7 @@ type Config struct {
 	PruneInterval time.Duration
 	Remote        string
 	VSSEnabled    bool
+	Embedder      Embedder // Custom embedder, nil means use DefaultEmbedder()
 }
 
 // DefaultConfig returns the default Mimir configuration
@@ -69,11 +70,12 @@ func DefaultConfig() *Config {
 
 // Store represents the Mimir memory store
 type Store struct {
-	db     *DB
-	config *Config
-	vss    VectorSearcher
-	enc    *Encryptor
-	sync   *Syncer
+	db       *DB
+	config   *Config
+	embedder Embedder
+	vss      VectorSearcher
+	enc      *Encryptor
+	sync     *Syncer
 }
 
 // NewStore creates a new Mimir store
@@ -93,12 +95,21 @@ func NewStore(cfg *Config) (*Store, error) {
 		return nil, fmt.Errorf("failed to open database: %w", err)
 	}
 
+	// Use custom embedder if provided, otherwise use DefaultEmbedder
+	var embedder Embedder
+	if cfg.Embedder != nil {
+		embedder = cfg.Embedder
+	} else {
+		embedder = DefaultEmbedder()
+	}
+
 	store := &Store{
-		db:     db,
-		config: cfg,
-		vss:    NewSimpleVectorSearch(),
-		enc:    NewEncryptor(),
-		sync:   NewSyncer(db),
+		db:       db,
+		config:   cfg,
+		embedder: embedder,
+		vss:      NewSimpleVectorSearch(),
+		enc:      NewEncryptor(),
+		sync:     NewSyncer(db),
 	}
 
 	// Try to initialize vector search
@@ -147,8 +158,8 @@ func (s *Store) Store(m *Memory) error {
 	m.AccessedAt = now
 
 	// Generate embedding if not present and vector search is enabled
-	if s.vss != nil && len(m.Embedding) == 0 {
-		embedding, err := s.vss.GenerateEmbedding(m.Content)
+	if s.vss != nil && len(m.Embedding) == 0 && s.embedder != nil {
+		embedding, err := s.embedder.GenerateEmbedding(m.Content)
 		if err != nil {
 			logger.Warn("Failed to generate embedding", "error", err)
 		} else {
@@ -200,8 +211,8 @@ func (s *Store) Search(query string, limit int) ([]SearchResult, error) {
 	}
 
 	// If vector search is available, use it
-	if s.vss != nil {
-		embedding, err := s.vss.GenerateEmbedding(query)
+	if s.vss != nil && s.embedder != nil {
+		embedding, err := s.embedder.GenerateEmbedding(query)
 		if err != nil {
 			return nil, fmt.Errorf("failed to generate query embedding: %w", err)
 		}
@@ -414,7 +425,6 @@ func (s *Store) SyncPull(remote string) error {
 
 // VectorSearcher interface for vector search implementations
 type VectorSearcher interface {
-	GenerateEmbedding(text string) ([]float32, error)
 	Search(query []float32, vectors [][]float32, k int) ([]int, []float64, error)
 }
 

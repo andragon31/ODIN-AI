@@ -124,9 +124,9 @@ func (c *Cache) Load(name, version string) (*Rune, error) {
 		return nil, fmt.Errorf("failed to read rune: %w", err)
 	}
 
-	rune, _, err := ValidateYAML(data)
-	if err != nil {
-		return nil, fmt.Errorf("failed to validate rune: %w", err)
+	rune, result := ValidateYAML(data)
+	if !result.Valid {
+		return nil, fmt.Errorf("failed to validate rune: %s", result.Errors)
 	}
 
 	return rune, nil

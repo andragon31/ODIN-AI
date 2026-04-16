@@ -1,0 +1,16 @@
+name: issue-creation
+version: 1.0.0
+description: "Issue creation workflow following issue-first enforcement system"
+author: Andragon
+tags: [git, issue, workflow, sdd, bug-report, feature-request]
+
+triggers:
+  commands: [issue, bug, feature]
+  context: [git, development, github]
+
+execution:
+  type: prompt
+  sandbox: false
+
+outputs:
+  console: "Issue created with proper template and status:needs-review label"

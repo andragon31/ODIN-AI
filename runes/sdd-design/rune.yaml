@@ -1,0 +1,16 @@
+name: sdd-design
+version: 1.0.0
+description: "Create technical design document with architecture decisions and approach"
+author: Andragon
+tags: [sdd, design, architecture, technical]
+
+triggers:
+  commands: [sdd, design, architecture]
+  context: [sdd, technical, implementation]
+
+execution:
+  type: prompt
+  sandbox: false
+
+outputs:
+  console: "Design document with architecture decisions, data flow, and file changes"

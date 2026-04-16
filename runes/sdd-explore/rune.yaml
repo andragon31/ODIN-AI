@@ -1,0 +1,16 @@
+name: sdd-explore
+version: 1.0.0
+description: "Explore and investigate ideas before committing to a change"
+author: Andragon
+tags: [sdd, exploration, research, analysis]
+
+triggers:
+  commands: [sdd, explore, investigate]
+  context: [sdd, research, codebase]
+
+execution:
+  type: prompt
+  sandbox: false
+
+outputs:
+  console: "Exploration analysis with approaches, risks, and recommendations"

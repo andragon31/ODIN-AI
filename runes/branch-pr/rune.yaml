@@ -1,0 +1,16 @@
+name: branch-pr
+version: 1.0.0
+description: "PR creation workflow following issue-first enforcement system"
+author: Andragon
+tags: [git, pr, workflow, sdd, conventional-commits]
+
+triggers:
+  commands: [pr, branch, merge]
+  context: [git, development, pull-request]
+
+execution:
+  type: prompt
+  sandbox: false
+
+outputs:
+  console: "PR created with conventional commit format and issue linkage"

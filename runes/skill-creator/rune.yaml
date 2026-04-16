@@ -1,0 +1,16 @@
+name: skill-creator
+version: 1.0.0
+description: "Creates new AI agent skills following the Agent Skills spec"
+author: Andragon
+tags: [skill, ai, agent, creation, workflow]
+
+triggers:
+  commands: [skill, create, new-skill]
+  context: [ai, agent, skills, creation]
+
+execution:
+  type: prompt
+  sandbox: false
+
+outputs:
+  console: "Skill created with SKILL.md, assets/, and proper frontmatter"

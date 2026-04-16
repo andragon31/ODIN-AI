@@ -1,0 +1,16 @@
+name: sdd-spec
+version: 1.0.0
+description: "Write specifications with requirements and scenarios (delta specs for changes)"
+author: Andragon
+tags: [sdd, specification, requirements, scenarios]
+
+triggers:
+  commands: [sdd, spec, specification]
+  context: [sdd, requirements, design]
+
+execution:
+  type: prompt
+  sandbox: false
+
+outputs:
+  console: "Delta specs created with ADDED/MODIFIED/REMOVED requirements"

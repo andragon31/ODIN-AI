@@ -1,0 +1,16 @@
+name: sdd-archive
+version: 1.0.0
+description: "Sync delta specs to main specs and archive a completed change"
+author: Andragon
+tags: [sdd, archive, sync, completion]
+
+triggers:
+  commands: [sdd, archive, complete]
+  context: [sdd, completion, cleanup]
+
+execution:
+  type: prompt
+  sandbox: false
+
+outputs:
+  console: "Change archived with specs synced to main and audit trail created"

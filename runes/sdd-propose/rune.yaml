@@ -1,0 +1,16 @@
+name: sdd-propose
+version: 1.0.0
+description: "Create a change proposal with intent, scope, and approach"
+author: Andragon
+tags: [sdd, proposal, change, planning]
+
+triggers:
+  commands: [sdd, propose, change]
+  context: [sdd, planning, architecture]
+
+execution:
+  type: prompt
+  sandbox: false
+
+outputs:
+  console: "Proposal created with intent, scope, approach, and success criteria"

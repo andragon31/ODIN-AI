@@ -1,0 +1,16 @@
+name: go-testing
+version: 1.0.0
+description: "Go testing patterns for Gentleman.Dots, including Bubbletea TUI testing"
+author: Andragon
+tags: [go, testing, tui, bubbletea, teatest, unit-test]
+
+triggers:
+  commands: [go, test, testing]
+  context: [go, testing, teatest, tui]
+
+execution:
+  type: prompt
+  sandbox: false
+
+outputs:
+  console: "Go tests with table-driven, teatest, and golden file patterns"
