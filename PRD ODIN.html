@@ -1,0 +1,704 @@
+<!DOCTYPE html>
+<html lang="es">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>PRD Maestro: Ecosistema Odyn (Nórdico Local-First)</title>
+    <style>
+        :root {
+            --bg: #0f172a;
+            --card: #1e293b;
+            --text: #e2e8f0;
+            --text-muted: #94a3b8;
+            --accent: #38bdf8;
+            --accent-dark: #0ea5e9;
+            --border: #334155;
+            --success: #22c55e;
+            --warning: #eab308;
+            --code-bg: #020617;
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+
+        body {
+            font-family: 'Inter', system-ui, -apple-system, sans-serif;
+            background: var(--bg);
+            color: var(--text);
+            line-height: 1.6;
+            padding: 2rem;
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+
+        header {
+            border-bottom: 2px solid var(--accent);
+            padding-bottom: 1.5rem;
+            margin-bottom: 2rem;
+        }
+
+        h1 {
+            font-size: 2.5rem;
+            color: var(--accent);
+            margin-bottom: 0.5rem;
+        }
+
+        h2 {
+            font-size: 1.8rem;
+            color: var(--accent);
+            margin: 2rem 0 1rem;
+            border-left: 4px solid var(--accent);
+            padding-left: 0.8rem;
+        }
+
+        h3 {
+            font-size: 1.3rem;
+            margin: 1.5rem 0 0.8rem;
+            color: var(--text);
+        }
+
+        p,
+        li {
+            margin-bottom: 0.8rem;
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin: 1.5rem 0;
+            background: var(--card);
+            border-radius: 8px;
+            overflow: hidden;
+        }
+
+        th,
+        td {
+            padding: 0.8rem 1rem;
+            text-align: left;
+            border-bottom: 1px solid var(--border);
+        }
+
+        th {
+            background: #0f172a;
+            color: var(--accent);
+            font-weight: 600;
+        }
+
+        tr:last-child td {
+            border-bottom: none;
+        }
+
+        pre,
+        code {
+            background: var(--code-bg);
+            padding: 0.2rem 0.4rem;
+            border-radius: 4px;
+            font-family: 'Fira Code', monospace;
+            font-size: 0.95em;
+        }
+
+        pre {
+            padding: 1rem;
+            overflow-x: auto;
+            margin: 1rem 0;
+            border-left: 3px solid var(--accent);
+        }
+
+        .tag {
+            display: inline-block;
+            background: var(--accent-dark);
+            color: white;
+            padding: 0.2rem 0.5rem;
+            border-radius: 4px;
+            font-size: 0.85em;
+            margin-right: 0.5rem;
+        }
+
+        .checklist {
+            list-style: none;
+        }
+
+        .checklist li::before {
+            content: "☐ ";
+            color: var(--accent);
+            font-weight: bold;
+            margin-right: 0.5rem;
+        }
+
+        .badge {
+            display: inline-block;
+            padding: 0.2rem 0.6rem;
+            border-radius: 999px;
+            font-size: 0.8rem;
+            font-weight: 600;
+            margin-right: 0.4rem;
+        }
+
+        .badge-oss {
+            background: #065f46;
+            color: #34d399;
+        }
+
+        .badge-local {
+            background: #7c3aed;
+            color: #c4b5fd;
+        }
+
+        .badge-ready {
+            background: #b45309;
+            color: #fcd34d;
+        }
+
+        footer {
+            margin-top: 3rem;
+            padding-top: 1.5rem;
+            border-top: 1px solid var(--border);
+            text-align: center;
+            color: var(--text-muted);
+            font-style: italic;
+        }
+
+        @media print {
+            body {
+                background: white;
+                color: black;
+            }
+
+            pre,
+            code,
+            table,
+            th,
+            td {
+                border: 1px solid #ccc;
+                background: #f8fafc;
+                color: #000;
+            }
+
+            .tag,
+            .badge {
+                border: 1px solid #666;
+                background: none;
+                color: #000;
+            }
+        }
+    </style>
+</head>
+
+<body>
+    <div class="container">
+        <header>
+            <h1>📜 PRD MAESTRO: ECOSISTEMA ODYN (Nórdico Local-First)</h1>
+            <p><strong>Documento de Arquitectura & Roadmap</strong> | <span class="tag badge badge-ready">READY FOR
+                    OPENCODE</span></p>
+            <p><strong>Autor:</strong> Andragon | <strong>Base:</strong> Gentle AI Ecosystem</p>
+            <p><strong>Licencia Objetivo:</strong> MIT (código), Apache 2.0 (infra/plugins), CC-BY-SA 4.0 (docs)</p>
+            <p><strong>Filosofía:</strong> <span class="badge badge-local">Local-First</span> <span
+                    class="badge badge-oss">100% OSS</span> <span class="badge badge-oss">$0 costo infra</span>
+                Instalación en 1 comando · Para la banda</p>
+        </header>
+
+        <main>
+            <section id="vision">
+                <h2>🌍 1. VISIÓN & PRINCIPIOS DEL ECOSISTEMA NÓRDICO</h2>
+                <h3>1.1 Declaración de Visión</h3>
+                <p>Evolucionar cada herramienta del ecosistema Gentle AI en un homólogo nórdico <strong>local-first,
+                        open-source y sin dependencias de nube</strong>. Mantener la simplicidad de instalación de
+                    Gentle, pero elevar la arquitectura a nivel enterprise mediante motores vectoriales locales,
+                    políticas como código, sincronización CRDT y runtime seguro WASM.</p>
+
+                <h3>1.2 Principios Fundamentales</h3>
+                <table>
+                    <tr>
+                        <th>Principio</th>
+                        <th>Implicación Técnica</th>
+                    </tr>
+                    <tr>
+                        <td>🏔️ <strong>Local-First</strong></td>
+                        <td>Todo funciona offline. La nube es opcional (sync/observabilidad).</td>
+                    </tr>
+                    <tr>
+                        <td>🔓 <strong>100% OSS</strong></td>
+                        <td>Cero licencias propietarias. Stack validado por licencia (MIT/Apache/BSD/MPL).</td>
+                    </tr>
+                    <tr>
+                        <td>📦 <strong>Instalación Progresiva</strong></td>
+                        <td><code>local</code> (1 binario) → <code>docker</code> (stack completo) → <code>cluster</code>
+                            (K8s). Un solo comando.</td>
+                    </tr>
+                    <tr>
+                        <td>🛡️ <strong>Privacidad por Defecto</strong></td>
+                        <td>Cifrado en reposo, sandbox de plugins, sin telemetría oculta, keys locales.</td>
+                    </tr>
+                    <tr>
+                        <td>🔄 <strong>Compatibilidad Gentle</strong></td>
+                        <td>Migración automática (<code>odyn migrate --from gentle</code>). Sin breaking changes en
+                            v1.0.</td>
+                    </tr>
+                    <tr>
+                        <td>🤝 <strong>Para la Banda</strong></td>
+                        <td>Documentación clara, costos $0, gobernanza abierta, alternativas libres a todo.</td>
+                    </tr>
+                </table>
+            </section>
+
+            <section id="mapa">
+                <h2>🗺️ 2. MAPA DE HOMÓLOGOS NÓRDICOS</h2>
+                <table>
+                    <tr>
+                        <th>Componente Gentle</th>
+                        <th>Función Actual</th>
+                        <th>Homólogo Nórdico</th>
+                        <th>Rol en Odyn</th>
+                    </tr>
+                    <tr>
+                        <td><code>gentle-ai</code></td>
+                        <td>CLI + Orquestador SDD</td>
+                        <td><strong>Odin AI</strong></td>
+                        <td>Core orchestrator, router universal, state manager</td>
+                    </tr>
+                    <tr>
+                        <td><code>GGA</code> (Guardian)</td>
+                        <td>Pre-commit + AI review</td>
+                        <td><strong>Heimdall</strong></td>
+                        <td>Guardian security, policy-as-code, local SAST</td>
+                    </tr>
+                    <tr>
+                        <td><code>Engram</code></td>
+                        <td>Memoria persistente SQLite</td>
+                        <td><strong>Mimir</strong></td>
+                        <td>Memory engine, vector search, knowledge graph</td>
+                    </tr>
+                    <tr>
+                        <td><code>Skills Library</code></td>
+                        <td>Workflows <code>.md</code> estáticos</td>
+                        <td><strong>Runes</strong></td>
+                        <td>Skills registry, validation, sandbox testing</td>
+                    </tr>
+                    <tr>
+                        <td><code>Config Sync</code></td>
+                        <td>Sincronización cross-agent</td>
+                        <td><strong>Bifrost</strong></td>
+                        <td>CRDT sync engine, conflict resolution, Git-backed</td>
+                    </tr>
+                    <tr>
+                        <td><code>TUI</code></td>
+                        <td>Interfaz Bubbletea</td>
+                        <td><strong>Völva</strong></td>
+                        <td>Interface engine, themes, accessibility, plugin UI</td>
+                    </tr>
+                    <tr>
+                        <td><code>E2E Pipeline</code></td>
+                        <td>Testing en contenedores</td>
+                        <td><strong>Nornir</strong></td>
+                        <td>Verification suite, flaky detection, local benchmarks</td>
+                    </tr>
+                    <tr>
+                        <td><code>Installers</code></td>
+                        <td>Scripts de despliegue</td>
+                        <td><strong>Dvergar</strong></td>
+                        <td>Progressive forge, atomic upgrades, rollback, cosign</td>
+                    </tr>
+                </table>
+            </section>
+
+            <section id="analisis">
+                <h2>🔍 3. ANÁLISIS DETALLADO POR COMPONENTE</h2>
+
+                <h3>3.1 <code>gentle-ai</code> → 🐺 <strong>Odin AI</strong> (Core Orchestrator)</h3>
+                <p><strong>✅ Ventajas Actuales:</strong> CLI en Go, SDD de 9 fases, integración MCP, routing básico,
+                    configuración declarativa.<br>
+                    <strong>⚠️ Limitaciones:</strong> Routing atado a un agente, sin fallback automático, estado volátil
+                    entre fases, sin runtime de extensiones, configuración compleja para multi-usuario.<br>
+                    <strong>🎯 Estrategia Local-First:</strong> Router universal con tabla dinámica por fase + fallback
+                    chain (Ollama → económico → premium). Estado persistente en <code>~/.odin/sessions/</code> con
+                    snapshots Git. WASM plugin runtime (<code>wasmtime-go</code>). Modo <code>local</code> puro: 1
+                    binario estático, &lt;50MB.
+                </p>
+                <p><strong>📦 Stack OSS:</strong> <code>cobra</code> (MIT), <code>viper</code> (MIT),
+                    <code>wasmtime-go</code> (Apache 2.0), <code>go-crdt</code> (MIT), <code>ollama/ollama</code>
+                    (MIT)<br>
+                    <strong>✅ Criterios OpenCode:</strong>
+                </p>
+                <ul class="checklist">
+                    <li><code>odin status</code> retorna JSON/TUI válido en &lt;800ms</li>
+                    <li>Fallback automático en ≤3 intentos si proveedor falla</li>
+                    <li>Plugin WASM ejecuta sin red/FS por defecto</li>
+                    <li><code>odin migrate --from gentle</code> copia configs sin romper</li>
+                </ul>
+
+                <h3>3.2 <code>GGA</code> → 🌉 <strong>Heimdall</strong> (Guardian Security)</h3>
+                <p><strong>✅ Ventajas Actuales:</strong> Pre-commit hooks, code review con LLM, switcher de proveedores,
+                    análisis básico de calidad.<br>
+                    <strong>⚠️ Limitaciones:</strong> Reglas hardcodeadas, dependencia de un proveedor de IA, lento en
+                    diffs grandes, sin motor de políticas, no bloquea commits inseguros.<br>
+                    <strong>🎯 Estrategia Local-First:</strong> Policy-as-Code con OPA (Rego) ejecutado 100% local. SAST
+                    ligero integrado: <code>gosec</code> + <code>semgrep</code> OSS. Multi-model review con fallback a
+                    modelo local. Integración nativa con <code>pre-commit</code> + CI (<code>exit 0/1/2</code>).
+                </p>
+                <p><strong>📦 Stack OSS:</strong> <code>opa</code> (Apache 2.0), <code>semgrep</code> (LGPLv2.1),
+                    <code>gosec</code> (Apache 2.0), <code>pre-commit</code> (MIT)<br>
+                    <strong>✅ Criterios OpenCode:</strong>
+                </p>
+                <ul class="checklist">
+                    <li><code>heimdall check</code> analiza diff + aplica reglas Rego en &lt;2s</li>
+                    <li>Fallback a modelo local si API externa falla</li>
+                    <li>Hook <code>pre-commit</code> bloquea commits con vulnerabilidades críticas</li>
+                    <li>Reporte JSON para CI/CD pipelines</li>
+                </ul>
+
+                <h3>3.3 <code>Engram</code> → 🧠 <strong>Mimir</strong> (Memory Engine)</h3>
+                <p><strong>✅ Ventajas Actuales:</strong> SQLite FTS5, persistencia cross-session, servidor MCP, sync con
+                    Git, estructura limpia.<br>
+                    <strong>⚠️ Limitaciones:</strong> Solo búsqueda por keywords, sin embeddings vectoriales, contexto
+                    aislado por proyecto, sin cifrado, sin retención inteligente.<br>
+                    <strong>🎯 Estrategia Local-First:</strong> Dual engine: <code>sqlite-vss</code> (local) ↔
+                    <code>pgvector</code> (docker opcional). Knowledge graph: aristas entre recuerdos. Cifrado en reposo
+                    con <code>age</code> (Go). Pruning automático: retiene tags <code>arch,spec,security</code>,
+                    descarta ruido.
+                </p>
+                <p><strong>📦 Stack OSS:</strong> <code>go-sqlite3</code> (MIT), <code>sqlite-vss</code> (MIT),
+                    <code>pgvector</code> (PostgreSQL), <code>age</code> (BSD 3), <code>go-crdt</code> (MIT)<br>
+                    <strong>✅ Criterios OpenCode:</strong>
+                </p>
+                <ul class="checklist">
+                    <li>Búsqueda semántica &lt;200ms en 10k registros</li>
+                    <li><code>mimir encrypt/decrypt</code> cifra/restaura sin pérdida</li>
+                    <li><code>mimir sync --remote</code> mergea sin conflictos</li>
+                    <li>Pruning automático en background (cron/systemd)</li>
+                </ul>
+
+                <h3>3.4 <code>Skills Library</code> → 🔮 <strong>Runes</strong> (Skills Registry)</h3>
+                <p><strong>✅ Ventajas Actuales:</strong> Workflows en Markdown, contribuciones comunitarias, fácil
+                    edición, integración con SDD.<br>
+                    <strong>⚠️ Limitaciones:</strong> Estáticos, sin validación runtime, errores de sintaxis rompen
+                    pipeline, sin versionado, difícil descubrimiento.<br>
+                    <strong>🎯 Estrategia Local-First:</strong> Schema validation con CUE antes de cargar. Registro
+                    local + cache: <code>odin rune search/install</code>. Sandbox testing:
+                    <code>odin rune test &lt;id&gt;</code> valida output esperado. Auto-update con rollback si falla
+                    validación.
+                </p>
+                <p><strong>📦 Stack OSS:</strong> <code>cue</code> (Apache 2.0), <code>go-yaml</code> (MIT),
+                    <code>wasmtime</code> (sandbox)<br>
+                    <strong>✅ Criterios OpenCode:</strong>
+                </p>
+                <ul class="checklist">
+                    <li><code>odin rune install</code> valida schema antes de escribir</li>
+                    <li>Skill malformado no bloquea SDD, solo warning logueado</li>
+                    <li><code>odin rune test</code> retorna pass/fail con diff de salida</li>
+                    <li>Cache local evita red para skills frecuentes</li>
+                </ul>
+
+                <h3>3.5 <code>Config Sync</code> → 🌈 <strong>Bifrost</strong> (Sync Engine)</h3>
+                <p><strong>✅ Ventajas Actuales:</strong> Sincronización cross-agent, consistencia básica,
+                    Git-backed.<br>
+                    <strong>⚠️ Limitaciones:</strong> Conflictos silenciosos sobrescriben configs, sin historial ni
+                    ramas, incompatible con paths WSL/macOS/Linux.<br>
+                    <strong>🎯 Estrategia Local-First:</strong> Repo Git bare en <code>~/.odin/config/</code>. Merge
+                    CRDT para claves conflictivas. Sync multi-dispositivo: <code>odin sync push/pull/status</code>.
+                    Firmas GPG opcionales para commits de config.
+                </p>
+                <p><strong>📦 Stack OSS:</strong> <code>go-git</code> (Apache 2.0), <code>go-crdt</code> (MIT),
+                    <code>golang.org/x/crypto/ssh</code> (BSD)<br>
+                    <strong>✅ Criterios OpenCode:</strong>
+                </p>
+                <ul class="checklist">
+                    <li><code>odin sync init</code> crea repo local en <code>~/.odin/config/</code></li>
+                    <li>Conflictos resueltos automáticamente o marcados para revisión</li>
+                    <li><code>odin sync diff</code> muestra cambios antes de aplicar</li>
+                    <li>Funciona en WSL2, macOS ARM, Linux x86 sin paths hardcodeados</li>
+                </ul>
+
+                <h3>3.6 <code>TUI</code> → 🕳️ <strong>Völva</strong> (Interface Engine)</h3>
+                <p><strong>✅ Ventajas Actuales:</strong> Bubbletea + Lipgloss, tema Rose Pine, interactividad básica,
+                    CLI coherente.<br>
+                    <strong>⚠️ Limitaciones:</strong> Tema fijo, interactividad limitada, no extensible, sin
+                    accesibilidad, sin modo script.<br>
+                    <strong>🎯 Estrategia Local-First:</strong> Engine de temas:
+                    <code>völva theme set rose-pine|nord|custom.toml</code>. Accesibilidad: alto contraste, screen
+                    reader support. Modos: <code>--json</code> (scripts), <code>--quiet</code> (CI),
+                    <code>--interactive</code> (default). Componentes embebibles para plugins.
+                </p>
+                <p><strong>📦 Stack OSS:</strong> <code>bubbletea</code> (MIT), <code>lipgloss</code> (MIT),
+                    <code>charmbracelet/huh</code> (MIT)<br>
+                    <strong>✅ Criterios OpenCode:</strong>
+                </p>
+                <ul class="checklist">
+                    <li><code>völva theme set</code> cambia tema sin reiniciar CLI</li>
+                    <li><code>--json</code> produce salida serializable válida</li>
+                    <li>Soporte básico screen reader + navegación por teclado</li>
+                    <li>Plugin puede inyectar TUI component via WASM hook</li>
+                </ul>
+
+                <h3>3.7 <code>E2E Pipeline</code> → 📜 <strong>Nornir</strong> (Verification Suite)</h3>
+                <p><strong>✅ Ventajas Actuales:</strong> Matriz multi-OS, contenedores Docker, CI/CD integrado, pruebas
+                    deterministas.<br>
+                    <strong>⚠️ Limitaciones:</strong> Contenedores pesados, pipeline lento, no detecta tests flaky, sin
+                    benchmarks de latencia/costo.<br>
+                    <strong>🎯 Estrategia Local-First:</strong> <code>testcontainers-go</code> con contenedores efímeros
+                    + cleanup automático. Detección de flaky tests con re-ejecución + umbral de consistencia. Benchmarks
+                    locales: <code>k6</code> + <code>pprof</code>. Reporte JSON para dashboard local.
+                </p>
+                <p><strong>📦 Stack OSS:</strong> <code>testcontainers-go</code> (MIT), <code>k6</code> (Apache 2.0),
+                    <code>go-pprof</code> (BSD)<br>
+                    <strong>✅ Criterios OpenCode:</strong>
+                </p>
+                <ul class="checklist">
+                    <li><code>make test-e2e</code> corre en &lt;15 min en CI</li>
+                    <li>Tests flaky marcados con <code>@flaky</code> y reportados</li>
+                    <li>Benchmarks de latencia &lt;2s para fases críticas</li>
+                    <li>Cleanup automático de contenedores post-run</li>
+                </ul>
+
+                <h3>3.8 <code>Installers</code> → ⚒️ <strong>Dvergar</strong> (Forge/Deploy)</h3>
+                <p><strong>✅ Ventajas Actuales:</strong> <code>curl | bash</code>, cross-platform, setup rápido.<br>
+                    <strong>⚠️ Limitaciones:</strong> Sin rollback, verificación frágil, sin detección de entorno, fallo
+                    silencioso en máquinas limpias.<br>
+                    <strong>🎯 Estrategia Local-First:</strong> One-liner progresivo:
+                    <code>curl -fsSL https://get.odin.ai/install.sh | bash -s -- --mode auto</code>. Verificación
+                    criptográfica: <code>cosign verify-blob</code> + <code>sigstore</code>. Backup atómico pre-upgrade +
+                    rollback en ≤3s si falla. Detección inteligente: SO, arquitectura, Docker/Podman/K8s.
+                </p>
+                <p><strong>📦 Stack OSS:</strong> <code>bash</code> + <code>cosign</code> (Apache 2.0), <code>tar</code>
+                    + <code>gzip</code>, <code>shasum</code><br>
+                    <strong>✅ Criterios OpenCode:</strong>
+                </p>
+                <ul class="checklist">
+                    <li>Instalación limpia en &lt;2 min en Ubuntu/macOS/WSL2</li>
+                    <li><code>cosign verify</code> pasa antes de ejecutar</li>
+                    <li><code>odin upgrade</code> backup + migrate + rollback automático</li>
+                    <li><code>odin status</code> post-install muestra stack saludable</li>
+                </ul>
+            </section>
+
+            <section id="arquitectura">
+                <h2>🏗️ 4. ARQUITECTURA CROSS-CUTTING</h2>
+                <h3>4.1 Estructura de Repositorio (Monorepo Inicial)</h3>
+                <pre><code>odin-ecosystem/
+├── cmd/odin/              # CLI entrypoint (Odin + Völva)
+├── internal/
+│   ├── orchestrator/      # SDD + State + Git snapshots
+│   ├── router/            # Universal model routing
+│   ├── guardian/          # Heimdall (OPA + SAST)
+│   ├── memory/            # Mimir (sqlite-vss + age)
+│   ├── sync/              # Bifrost (go-git + CRDT)
+│   ├── skills/            # Runes (CUE + sandbox)
+│   ├── plugins/           # WASM runtime + hooks
+│   └── verify/            # Nornir (testcontainers + k6)
+├── deploy/                # Dvergar (install.sh + cosign)
+├── docs/                  # Docusaurus + playgrounds
+├── runes/                 # Skills registry base
+├── e2e/                   # Matrix tests
+├── go.work
+└── Makefile</code></pre>
+
+                <h3>4.2 Configuración Unificada (<code>~/.odin/config.yaml</code>)</h3>
+                <pre><code>version: "1.0"
+mode: "local"
+memory:
+  engine: "sqlite-vss"
+  path: "~/.odin/memory.db"
+  encryption: true
+sync:
+  backend: "git"
+  remote: "git@github.com:user/odin-config.git"
+guardian:
+  policy_engine: "opa"
+  rules: ["~/.odin/rules/"]
+router:
+  default: "ollama-local"
+  fallback: ["openrouter", "anthropic"]
+  cost_cap_daily: 0.0
+observability:
+  metrics_port: 9090
+  log_level: "info"
+plugins:
+  sandbox: true
+  auto_update: false</code></pre>
+
+                <h3>4.3 Flujo de Datos Local-First</h3>
+                <pre><code>[Usuario/Terminal] → Völva (TUI/JSON) → Odin (Orchestrator)
+       ↓
+   Router (decide modelo local/remoto) → Heimdall (valida políticas/SAST)
+       ↓
+   Mimir (indexa/consulta memoria vectorial) ↔ Bifrost (sync config CRDT)
+       ↓
+   Runes (carga skills validados) → Plugins (WASM sandbox)
+       ↓
+   Nornir (verifica E2E + benchmarks) → Dvergar (backup/upgrade atómico)</code></pre>
+            </section>
+
+            <section id="roadmap">
+                <h2>🗓️ 5. ROADMAP SPRINT-BASED (OPENCODE READY)</h2>
+                <table>
+                    <tr>
+                        <th>Sprint</th>
+                        <th>Homólogo</th>
+                        <th>Entregables</th>
+                        <th>Criterios Aceptación</th>
+                        <th>Prompt OpenCode</th>
+                    </tr>
+                    <tr>
+                        <td><strong>S1</strong></td>
+                        <td>Odin Core</td>
+                        <td>CLI base, config parser, <code>init/status</code>, TUI flags</td>
+                        <td><code>odin status</code> JSON válido &lt;800ms, <code>--quiet/--json</code> funcional</td>
+                        <td><code>"Genera cmd/odin/, internal/cli/, go.work. Cobra + viper + bubbletea. Implementa init/status con TUI/JSON. Añade flags --quiet/--json."</code>
+                        </td>
+                    </tr>
+                    <tr>
+                        <td><strong>S2</strong></td>
+                        <td>Mimir</td>
+                        <td>sqlite-vss, search/store/prune, age encrypt</td>
+                        <td>Búsqueda &lt;200ms, cifrado verificable, pruning automático</td>
+                        <td><code>"Crea internal/memory/ con go-sqlite3 + sqlite-vss. Implementa store/search/prune. Añade age encryption/decryption. Valida schema PRD."</code>
+                        </td>
+                    </tr>
+                    <tr>
+                        <td><strong>S3</strong></td>
+                        <td>Router</td>
+                        <td>Provider loading, fallback chain, cost tracking</td>
+                        <td>Fallback en 3s, métricas registradas, compatibilidad openai-go</td>
+                        <td><code>"Implementa internal/router/ con fallback chain. Integra openai-go compatible. Añade cost tracker + metrics export. Valida con providers.yaml ejemplo."</code>
+                        </td>
+                    </tr>
+                    <tr>
+                        <td><strong>S4</strong></td>
+                        <td>Heimdall</td>
+                        <td>OPA integration, semgrep, pre-commit hook</td>
+                        <td>Reglas Rego aplicadas, bloqueo automático, reporte CI</td>
+                        <td><code>"Crea internal/guardian/ con OPA + semgrep. Genera pre-commit hook. Retorna 0/1/2 para CI. Añade policy-as-code docs."</code>
+                        </td>
+                    </tr>
+                    <tr>
+                        <td><strong>S5</strong></td>
+                        <td>Bifrost</td>
+                        <td>Git repo local, CRDT merge, push/pull</td>
+                        <td>Conflictos resueltos, diff pre-apply, multi-OS paths</td>
+                        <td><code>"Implementa internal/sync/ con go-git + CRDT. Crea push/pull/status commands. Añade diff pre-apply. Valida en WSL/macOS/Linux."</code>
+                        </td>
+                    </tr>
+                    <tr>
+                        <td><strong>S6</strong></td>
+                        <td>Runes</td>
+                        <td>Schema validation, install/test, cache</td>
+                        <td>Validación CUE, sandbox test pass, cache local</td>
+                        <td><code>"Crea internal/skills/ con cue validation. Implementa install/test commands. Añade sandbox execution + local cache."</code>
+                        </td>
+                    </tr>
+                    <tr>
+                        <td><strong>S7</strong></td>
+                        <td>Dvergar</td>
+                        <td>install.sh, cosign verify, upgrade+rollback</td>
+                        <td>Instalación &lt;2 min, rollback automático, firma verificada</td>
+                        <td><code>"Escribe deploy/install.sh con detección SO, cosign verify, backup pre-upgrade, rollback automático. Valida en CI local."</code>
+                        </td>
+                    </tr>
+                    <tr>
+                        <td><strong>S8</strong></td>
+                        <td>Nornir + Völva</td>
+                        <td>testcontainers, matrix, flaky, theme engine</td>
+                        <td>E2E &lt;15 min, flaky marcado, temas cambiables, benchmarks</td>
+                        <td><code>"Crea e2e/ con testcontainers-go, OS matrix, k6 benchmarks. Implementa völva theme engine. Añade flaky detection + cleanup."</code>
+                        </td>
+                    </tr>
+                </table>
+            </section>
+
+            <section id="seguridad">
+                <h2>🛡️ 6. SEGURIDAD, PRIVACIDAD & LICENCIAS</h2>
+                <h3>6.1 Matriz de Licencias Permitidas</h3>
+                <table>
+                    <tr>
+                        <th>Capa</th>
+                        <th>✅ Permitidas</th>
+                        <th>❌ Rechazadas</th>
+                    </tr>
+                    <tr>
+                        <td>Código Core</td>
+                        <td>MIT, Apache 2.0, BSD 2/3, ISC, MPL 2.0</td>
+                        <td>GPL v2/v3, SSPL, BSL, Propietarias</td>
+                    </tr>
+                    <tr>
+                        <td>Infraestructura</td>
+                        <td>AGPLv3 (self-hosted), LGPLv2.1 (semgrep)</td>
+                        <td>SaaS-only, Vendor-locked</td>
+                    </tr>
+                    <tr>
+                        <td>Documentación</td>
+                        <td>CC-BY-SA 4.0, CC0</td>
+                        <td>NDAs, Restrictivas</td>
+                    </tr>
+                </table>
+
+                <h3>6.2 Políticas de Seguridad Local-First</h3>
+                <ul>
+                    <li>🔐 Cero telemetría oculta. Todo logueado local.</li>
+                    <li>🔑 API keys en <code>~/.odin/providers.yaml</code> con <code>chmod 600</code></li>
+                    <li>🛡️ Plugins ejecutan en sandbox WASM por defecto (sin red/FS)</li>
+                    <li>✅ Firmas de release con <code>cosign</code> + <code>sigstore</code></li>
+                    <li>🔄 Dependencias escaneadas en CI: <code>dependabot</code> + <code>trivy</code></li>
+                </ul>
+            </section>
+
+            <section id="opencode">
+                <h2>🤖 7. GUÍA DE EJECUCIÓN EN OPENCODE</h2>
+                <h3>7.1 Ingesta Inicial</h3>
+                <ol>
+                    <li>Guarda este documento como <code>PRD_ECOSISTEMA_ODYN.html</code> en tu workspace</li>
+                    <li>Carga el archivo completo en el contexto de OpenCode</li>
+                    <li>Ejecuta:
+                        <code>"Lee PRD.md. Inicia Sprint 1: Odin Core. Genera estructura cmd/, internal/cli/, go.work, Makefile. Implementa odin init/status con TUI + JSON. Valida con make test-unit."</code>
+                    </li>
+                </ol>
+
+                <h3>7.2 Prompts Estandarizados por Homólogo</h3>
+                <pre><code>🔹 ODIN: "Genera cmd/odin/ con cobra. Implementa config parsing (viper), TUI (bubbletea), status con health checks. Añade flags --json/--quiet."
+🔹 MIMIR: "Crea internal/memory/ con sqlite-vss. Implementa store/search/prune. Añade age encryption. Valida con schema PRD."
+🔹 ROUTER: "Implementa internal/router/ con fallback chain. Integra openai-go compatible. Añade cost tracker + metrics export."
+🔹 HEIMDALL: "Crea internal/guardian/ con OPA + semgrep. Genera pre-commit hook. Retorna 0/1/2. Añade policy-as-code docs."
+🔹 BIFROST: "Implementa internal/sync/ con go-git + CRDT. Crea push/pull/status. Añade diff pre-apply. Valida en WSL/macOS/Linux."
+🔹 DVERGAR: "Escribe deploy/install.sh con detección SO, cosign verify, backup pre-upgrade, rollback automático. Valida en CI."</code></pre>
+
+                <h3>7.3 Validación Continua</h3>
+                <pre><code># Por sprint
+make test-unit && make test-int
+odin status --json
+odin upgrade --dry-run
+heimdall check --diff HEAD~1
+mimir search --query "local-first architecture" --limit 5</code></pre>
+            </section>
+
+            <section id="checklist">
+                <h2>✅ 8. CHECKLIST DE ENTREGA FINAL (v1.0)</h2>
+                <ul class="checklist">
+                    <li><code>odin init</code> configura entorno en &lt;10s (modo auto)</li>
+                    <li><code>odin status</code> muestra salud de Mimir, Heimdall, Bifrost, Runes</li>
+                    <li>Memoria semántica &lt;200ms + cifrado opcional <code>age</code></li>
+                    <li>Router multi-model con fallback + cost tracking local</li>
+                    <li>Heimdall con OPA + semgrep + pre-commit hook</li>
+                    <li>Bifrost CRDT sin conflictos + diff pre-apply</li>
+                    <li>Runes con validación CUE + sandbox test</li>
+                    <li>Dvergar con cosign verify + rollback automático</li>
+                    <li>Nornir matrix &lt;15 min + flaky detection</li>
+                    <li>Völva con temas, accesibilidad, <code>--json</code>/<code>--quiet</code></li>
+                    <li>100% OSS, $0 costo infraestructura, local-first garantizado</li>
+                </ul>
+            </section>
+        </main>
+
+        <footer>
+            <p>🐺 <em>"Gentle AI fue la semilla. El ecosistema Odyn es el bosque. Local. Libre. Para la banda. Sin
+                    excusas."</em></p>
+            <p>Documento generado para Andragon | Abril 2026 | Listo para desarrollo en OpenCode</p>
+        </footer>
+    </div>
+</body>
+
+</html>
