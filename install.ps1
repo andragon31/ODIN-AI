@@ -4,9 +4,9 @@
 param(
     [string]$Version = "1.0.0",
     [string]$InstallPath = "$env:LOCALAPPDATA\Programs\ODIN",
-    [switch]$AddToPath,
     [switch]$DryRun,
-    [switch]$Uninstall
+    [switch]$Uninstall,
+    [switch]$SkipSetup
 )
 
 $ErrorActionPreference = "Stop"
@@ -16,6 +16,8 @@ function Write-Info { param([string]$Msg) Write-Host "[INFO] $Msg" -ForegroundCo
 function Write-Success { param([string]$Msg) Write-Host "[SUCCESS] $Msg" -ForegroundColor Green }
 function Write-Warn { param([string]$Msg) Write-Host "[WARN] $Msg" -ForegroundColor Yellow }
 function Write-Err { param([string]$Msg) Write-Host "[ERROR] $Msg" -ForegroundColor Red }
+function Write-Step { param([string]$Num, [string]$Msg) Write-Host "`n  [$Num] $Msg" -ForegroundColor Magenta }
+function Write-Prompt { param([string]$Msg) Write-Host $Msg -ForegroundColor Yellow }
 
 # Banner
 function Show-Banner {
@@ -43,7 +45,6 @@ function Get-Architecture {
 
 # Detect OS
 function Get-OS {
-    if ($IsWindows) { return "windows" }
     return "windows"
 }
 
@@ -80,30 +81,6 @@ function Download-File {
     }
 }
 
-# Verify checksum
-function Verify-Checksum {
-    param(
-        [string]$File,
-        [string]$Expected
-    )
-
-    if (-not $Expected) {
-        Write-Warn "No checksum provided, skipping verification"
-        return $true
-    }
-
-    Write-Info "Verifying checksum..."
-    $hash = (Get-FileHash -Path $File -Algorithm SHA256).Hash.ToLower()
-
-    if ($hash -eq $Expected.ToLower()) {
-        Write-Success "Checksum verified!"
-        return $true
-    } else {
-        Write-Err "Checksum mismatch! Expected: $Expected, Got: $hash"
-        return $false
-    }
-}
-
 # Create directories
 function Initialize-Directories {
     $configDir = "$env:USERPROFILE\.odin"
@@ -132,11 +109,112 @@ function Add-ToPath {
 
     $newPath = "$userPath;$Path"
     [Environment]::SetEnvironmentVariable("Path", $newPath, "User")
+    $env:Path = $newPath  # Update current session
     Write-Success "Added $Path to PATH"
-    Write-Info "Please restart your terminal or run: refreshenv"
 }
 
-# Install ODIN
+# Get ODIN executable path
+function Get-OdinPath {
+    param([string]$InstallPath)
+    $exePath = Join-Path $InstallPath "odin.exe"
+    if (Test-Path $exePath) {
+        return $exePath
+    }
+    # Try finding the exe
+    $found = Get-ChildItem -Path $InstallPath -Filter "*.exe" -Recurse | Select-Object -First 1
+    return $found.FullName
+}
+
+# Run ODIN command
+function Invoke-Odin {
+    param([string]$Args, [string]$InstallPath)
+    $exePath = Get-OdinPath -InstallPath $InstallPath
+    if ($exePath) {
+        & $exePath $Args
+    } else {
+        Write-Err "ODIN executable not found"
+    }
+}
+
+# ============================================================================
+# POST-INSTALLATION SETUP WIZARD
+# ============================================================================
+
+function Show-SetupWizard {
+    param([string]$InstallPath)
+
+    $exePath = Get-OdinPath -InstallPath $InstallPath
+
+    Write-Host ""
+    Write-Host "════════════════════════════════════════════════════════════" -ForegroundColor Magenta
+    Write-Host "                    CONFIGURACIÓN INICIAL" -ForegroundColor Magenta
+    Write-Host "════════════════════════════════════════════════════════════" -ForegroundColor Magenta
+
+    Write-Step "1" "Inicializando ODIN..."
+    Write-Host "   Ejecutando: odin init"
+    & $exePath init --quiet 2>$null
+    if ($LASTEXITCODE -eq 0) {
+        Write-Success "   ODIN inicializado correctamente"
+    } else {
+        Write-Warn "   ODIN init completado (puede que ya existiera)"
+    }
+
+    Write-Step "2" "Verificando instalación..."
+    Write-Host "   Ejecutando: odin --version"
+    $versionOutput = & $exePath --version 2>$null
+    Write-Host "   Versión: $versionOutput" -ForegroundColor White
+
+    Write-Step "3" "Configurando Router (Provider de IA)..."
+    Write-Host ""
+    Write-Host "   ODIN soporta múltiples providers de IA:" -ForegroundColor White
+    Write-Host "   1. Ollama (local, gratis) - Recommended" -ForegroundColor Cyan
+    Write-Host "   2. OpenRouter (API, económico)" -ForegroundColor Cyan
+    Write-Host "   3. Anthropic (API, premium)" -ForegroundColor Cyan
+    Write-Host ""
+    Write-Prompt "   ¿Tienes Ollama instalado localmente? (S/n)"
+    $response = Read-Host "   "
+    if ($response -ne "n" -and $response -ne "N") {
+        Write-Info "   Configurando Ollama como provider principal..."
+        & $exePath router set ollama --quiet 2>$null
+        Write-Success "   Ollama configurado"
+    } else {
+        Write-Info "   Puedes configurar después con: odin router set <provider>"
+    }
+
+    Write-Step "4" "Configurando Heimdall (Seguridad)..."
+    Write-Host "   Heimdall proporciona análisis de seguridad SAST" -ForegroundColor White
+    Write-Host "   Para instalar reglas personalizadas:" -ForegroundColor White
+    Write-Host "   odin heimdall hook-install" -ForegroundColor Cyan
+
+    Write-Step "5" "Sincronización con Bifrost..."
+    Write-Host "   Bifrost permite sincronizar tu configuración" -ForegroundColor White
+    Write-Host "   Para inicializar: odin sync init" -ForegroundColor Cyan
+
+    Write-Host ""
+    Write-Host "════════════════════════════════════════════════════════════" -ForegroundColor Magenta
+    Write-Host "                    ¡INSTALACIÓN COMPLETA!" -ForegroundColor Magenta
+    Write-Host "════════════════════════════════════════════════════════════" -ForegroundColor Magenta
+
+    Write-Host ""
+    Write-Host "  Comandos disponibles:" -ForegroundColor White
+    Write-Host ""
+    Write-Host "  odin status              Ver estado del sistema" -ForegroundColor Green
+    Write-Host "  odin router status       Ver providers configurados" -ForegroundColor Green
+    Write-Host "  odin mimir --help        Gestionar memoria" -ForegroundColor Green
+    Write-Host "  odin heimdall --help      Seguridad" -ForegroundColor Green
+    Write-Host "  odin sync --help          Sincronización" -ForegroundColor Green
+    Write-Host "  odin theme --help         Temas" -ForegroundColor Green
+    Write-Host ""
+    Write-Host "  Documentación: https://github.com/andragon31/ODIN-AI" -ForegroundColor Gray
+    Write-Host ""
+    Write-Prompt "  Presiona ENTER para continuar..."
+    Read-Host
+}
+
+# ============================================================================
+# INSTALL ODIN
+# ============================================================================
+
 function Install-ODIN {
     param(
         [string]$Version,
@@ -144,7 +222,8 @@ function Install-ODIN {
     )
 
     Show-Banner
-    Write-Info "Installing ODIN AI v$Version..."
+    Write-Info "Instalando ODIN AI v$Version..."
+    Write-Info "Instalando en: $InstallPath"
 
     $os = Get-OS
     $arch = Get-Architecture
@@ -166,7 +245,7 @@ function Install-ODIN {
         # Download URL
         $downloadUrl = "https://github.com/andragon31/ODIN-AI/releases/download/v$Version/$archiveName"
 
-        # If no pre-built binary, build locally
+        # Check if pre-built binary exists
         $shouldBuild = $true
         try {
             $response = Invoke-WebRequest -Uri $downloadUrl -UseBasicParsing -TimeoutSec 5
@@ -174,13 +253,24 @@ function Install-ODIN {
                 $shouldBuild = $false
             }
         } catch {
-            Write-Warn "Pre-built binary not found, will try to build locally"
+            Write-Warn "Pre-built binary not found"
         }
 
         if ($shouldBuild) {
-            Write-Info "Pre-built binary not available for this version"
-            Write-Info "Please use: git clone https://github.com/andragon31/ODIN-AI.git"
-            Write-Info "Then run: go build -o odin.exe ./cmd/odin"
+            Write-Host ""
+            Write-Warn "════════════════════════════════════════════════════════════" -ForegroundColor Yellow
+            Write-Warn "  ¡ATENCIÓN! No hay binario pre-compilado para esta versión" -ForegroundColor Yellow
+            Write-Warn "════════════════════════════════════════════════════════════" -ForegroundColor Yellow
+            Write-Host ""
+            Write-Host "  Para instalar desde código fuente:" -ForegroundColor White
+            Write-Host ""
+            Write-Host "  1. git clone https://github.com/andragon31/ODIN-AI.git" -ForegroundColor Cyan
+            Write-Host "  2. cd ODIN-AI" -ForegroundColor Cyan
+            Write-Host "  3. go build -o odin.exe ./cmd/odin" -ForegroundColor Cyan
+            Write-Host ""
+            Write-Host "  O espera a que se publiquen los binarios en:" -ForegroundColor White
+            Write-Host "  https://github.com/andragon31/ODIN-AI/releases" -ForegroundColor Cyan
+            Write-Host ""
             return
         }
 
@@ -192,36 +282,31 @@ function Install-ODIN {
         New-Item -ItemType Directory -Force -Path $InstallPath | Out-Null
 
         # Extract
-        Write-Info "Extracting..."
+        Write-Info "Extrayendo..."
         tar -xzf $archivePath -C $InstallPath
 
-        # Make executable
-        $exePath = Join-Path $InstallPath $exeName
-        if (Test-Path $exePath) {
-            Write-Success "Binary installed at $exePath"
+        # Find executable
+        $exePath = Get-OdinPath -InstallPath $InstallPath
+        if ($exePath) {
+            Write-Success "Binario instalado en: $exePath"
         } else {
-            # Try finding the exe
-            $found = Get-ChildItem -Path $InstallPath -Filter "*.exe" -Recurse | Select-Object -First 1
-            if ($found) {
-                Write-Success "Binary installed at $($found.FullName)"
-                $exePath = $found.FullName
-            }
+            Write-Err "No se pudo encontrar el ejecutable"
+            return
         }
 
         # Initialize directories
         Initialize-Directories
 
-        # Add to PATH
-        if ($AddToPath -or ([System.SecurityPrincipal.WindowsPrincipal][System.SecurityPrincipal.WindowsIdentity]::GetCurrent()).IsInRole([System.SecurityPrincipal.WindowsBuiltInRole]::Administrator)) {
-            Add-ToPath -Path $InstallPath
-        } else {
-            Write-Warn "Not adding to PATH (requires admin or -AddToPath flag)"
-        }
+        # Add to PATH (automatically)
+        Add-ToPath -Path $InstallPath
 
-        Write-Success "ODIN AI v$Version installed successfully!"
+        Write-Success "ODIN AI v$Version instalado correctamente!"
         Write-Host ""
-        Write-Host "Run 'odin --help' to get started" -ForegroundColor White
-        Write-Host "Or use: $exePath --help" -ForegroundColor White
+
+        # Run setup wizard unless skipped
+        if (-not $SkipSetup) {
+            Show-SetupWizard -InstallPath $InstallPath
+        }
 
     } finally {
         # Cleanup
@@ -229,41 +314,50 @@ function Install-ODIN {
     }
 }
 
-# Uninstall ODIN
+# ============================================================================
+# UNINSTALL
+# ============================================================================
+
 function Uninstall-ODIN {
     Show-Banner
-    Write-Warn "Uninstalling ODIN AI..."
+    Write-Warn "Desinstalando ODIN AI..."
 
     $exePath = Join-Path $InstallPath "odin.exe"
     if (Test-Path $exePath) {
         Remove-Item -Path $InstallPath -Recurse -Force
-        Write-Success "ODIN uninstalled from $InstallPath"
+        Write-Success "ODIN desinstalado de $InstallPath"
     } else {
-        Write-Err "ODIN not found at $InstallPath"
+        Write-Err "ODIN no encontrado en $InstallPath"
     }
 
-    Write-Info "Configuration files kept at $env:USERPROFILE\.odin"
-    Write-Info "To remove all data: Remove-Item -Recurse $env:USERPROFILE\.odin"
+    Write-Info "Archivos de configuración保留 en $env:USERPROFILE\.odin"
+    Write-Info "Para eliminar todo: Remove-Item -Recurse $env:USERPROFILE\.odin"
 }
 
-# Dry run
+# ============================================================================
+# DRY RUN
+# ============================================================================
+
 function Dry-Run {
     Show-Banner
     $os = Get-OS
     $arch = Get-Architecture
 
-    Write-Info "Dry run - would install:"
-    Write-Host "  Version:    $Version"
-    Write-Host "  OS:         $os"
-    Write-Host "  Arch:       $arch"
-    Write-Host "  Install to:  $InstallPath"
-    Write-Host "  Config at:  $env:USERPROFILE\.odin"
+    Write-Info "Dry run - instalación simulada:"
+    Write-Host "  Versión:     $Version"
+    Write-Host "  SO:          $os"
+    Write-Host "  Arquitectura:$arch"
+    Write-Host "  Instalar en: $InstallPath"
+    Write-Host "  Config en:   $env:USERPROFILE\.odin"
     Write-Host ""
-    Write-Info "Download URL would be:"
+    Write-Info "URL de descarga:"
     Write-Host "  https://github.com/andragon31/ODIN-AI/releases/download/v$Version/odin-$os-$arch.tar.gz"
 }
 
-# Main
+# ============================================================================
+# MAIN
+# ============================================================================
+
 function Main {
     if ($Uninstall) {
         Uninstall-ODIN
