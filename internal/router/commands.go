@@ -30,6 +30,7 @@ in order until one succeeds.`,
 		newRouterFallbackCmd(),
 		newRouterMetricsCmd(),
 		newRouterModelsCmd(),
+		newRouterDetectCursorCmd(),
 	)
 
 	return cmd
@@ -327,6 +328,49 @@ func runRouterModels(cmd *cobra.Command) error {
 		fmt.Println("  No model information available")
 	}
 
+	return nil
+}
+
+func newRouterDetectCursorCmd() *cobra.Command {
+	return &cobra.Command{
+		Use:   "detect-cursor",
+		Short: "Auto-detect models configured in Cursor IDE",
+		Long:  `Scan Cursor IDE settings to find configured AI models.`,
+		RunE: func(cmd *cobra.Command, args []string) error {
+			return runRouterDetectCursor(cmd)
+		},
+	}
+}
+
+func runRouterDetectCursor(cmd *cobra.Command) error {
+	jsonOutput, _ := cmd.Flags().GetBool("json")
+
+	models, err := DetectCursorModels()
+	if err != nil {
+		return fmt.Errorf("failed to detect Cursor models: %w", err)
+	}
+
+	if jsonOutput {
+		enc := json.NewEncoder(os.Stdout)
+		enc.SetIndent("", "  ")
+		return enc.Encode(models)
+	}
+
+	if len(models) == 0 {
+		fmt.Println("No Cursor models detected.")
+		fmt.Println("Make sure Cursor IDE is installed and has models configured.")
+		return nil
+	}
+
+	fmt.Println("╔════════════════════════════════════════════════════════╗")
+	fmt.Println("║         Detected Cursor Models                         ║")
+	fmt.Println("╠════════════════════════════════════════════════════════╣")
+
+	for _, m := range models {
+		fmt.Printf("║  %-20s │ %-15s │ %-15s║\n", m.Name, m.Provider, m.DisplayName)
+	}
+
+	fmt.Println("╚════════════════════════════════════════════════════════╝")
 	return nil
 }
 
