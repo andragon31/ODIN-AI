@@ -14,7 +14,7 @@
 set -e
 
 # Configuration
-REPO_NAME="odin-ai/odin"
+REPO_NAME="andragon31/ODIN-AI"
 INSTALL_DIR="${HOME}/.local/bin"
 CONFIG_DIR="${HOME}/.odin"
 INSTALL_SCRIPT_VERSION="1.0.0"
