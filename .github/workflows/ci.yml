@@ -1,0 +1,71 @@
+name: CI
+
+on:
+  push:
+    branches: [main, master]
+  pull_request:
+    branches: [main, master]
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: '1.24'
+          cache: true
+
+      - name: Vet
+        run: go vet ./...
+
+      - name: Build
+        run: go build -o /dev/null ./cmd/odin
+
+      - name: Test
+        run: go test -race -cover ./...
+
+  build-all-platforms:
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        include:
+          - os: ubuntu-latest
+            target: linux-amd64
+          - os: ubuntu-latest
+            target: linux-arm64
+          - os: macos-latest
+            target: darwin-amd64
+          - os: macos-latest
+            target: darwin-arm64
+          - os: windows-latest
+            target: windows-amd64
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: '1.24'
+
+      - name: Build
+        run: |
+          EXT=""
+          if [ "${{ matrix.target }}" = "windows-amd64" ]; then
+            EXT=".exe"
+          fi
+          go build -ldflags="-s -w" -o "odin-${{ matrix.target }}${EXT}" ./cmd/odin
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: odin-${{ matrix.target }}
+          path: odin-${{ matrix.target }}*
