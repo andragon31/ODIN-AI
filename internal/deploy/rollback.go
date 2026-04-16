@@ -1,0 +1,275 @@
+// Package deploy provides the Dvergar forge/deploy system for ODIN
+package deploy
+
+import (
+	"fmt"
+	"os"
+	"path/filepath"
+	"sort"
+	"strings"
+	"time"
+)
+
+// RollbackInfo contains information about a rollback point
+type RollbackInfo struct {
+	Path      string
+	Version   string
+	Timestamp time.Time
+}
+
+// ListBackups lists all available backups
+func (d *Dvergar) ListBackups() ([]RollbackInfo, error) {
+	backups := []RollbackInfo{}
+
+	entries, err := os.ReadDir(d.backupPath)
+	if err != nil {
+		if os.IsNotExist(err) {
+			return backups, nil
+		}
+		return nil, fmt.Errorf("failed to read backup directory: %w", err)
+	}
+
+	for _, entry := range entries {
+		if entry.IsDir() {
+			continue
+		}
+
+		name := entry.Name()
+		if !strings.HasPrefix(name, "odin-backup-") {
+			continue
+		}
+
+		path := filepath.Join(d.backupPath, name)
+		info, err := os.Stat(path)
+		if err != nil {
+			continue
+		}
+
+		// Parse timestamp from filename
+		// Format: odin-backup-YYYYMMDD-HHMMSS
+		ts := parseBackupTimestamp(name)
+		if ts.IsZero() {
+			ts = info.ModTime()
+		}
+
+		backups = append(backups, RollbackInfo{
+			Path:      path,
+			Version:   extractVersionFromPath(path),
+			Timestamp: ts,
+		})
+	}
+
+	// Sort by timestamp, newest first
+	sort.Slice(backups, func(i, j int) bool {
+		return backups[i].Timestamp.After(backups[j].Timestamp)
+	})
+
+	return backups, nil
+}
+
+// parseBackupTimestamp extracts timestamp from backup filename
+func parseBackupTimestamp(name string) time.Time {
+	// Remove prefix
+	ts := strings.TrimPrefix(name, "odin-backup-")
+
+	// Try to parse as YYYYMMDD-HHMMSS
+	formats := []string{
+		"20060102-150405",
+		"20060102-1504",
+		"20060102",
+	}
+
+	for _, format := range formats {
+		if t, err := time.Parse(format, ts); err == nil {
+			return t
+		}
+	}
+
+	return time.Time{}
+}
+
+// extractVersionFromPath extracts version from a path
+func extractVersionFromPath(path string) string {
+	// Try to extract version from the path
+	// In a real implementation, we might read the binary or a version file
+	base := filepath.Base(path)
+	parts := strings.Split(base, "-")
+	if len(parts) >= 3 {
+		return parts[2]
+	}
+	return "unknown"
+}
+
+// CreateBackup creates a backup of the current installation
+func (d *Dvergar) CreateBackup() (*RollbackInfo, error) {
+	if !d.IsInstalled() {
+		return nil, fmt.Errorf("no installation found at %s", d.installPath)
+	}
+
+	// Ensure backup directory exists
+	if err := os.MkdirAll(d.backupPath, 0755); err != nil {
+		return nil, fmt.Errorf("failed to create backup directory: %w", err)
+	}
+
+	// Generate backup filename with timestamp
+	timestamp := time.Now().Format("20060102-150405")
+	backupName := fmt.Sprintf("odin-backup-%s", timestamp)
+
+	// Determine extension
+	ext := ""
+	if d.installPath != "" && strings.HasSuffix(d.installPath, ".exe") {
+		ext = ".exe"
+	}
+
+	backupPath := filepath.Join(d.backupPath, backupName+ext)
+
+	// Copy the binary
+	if err := copyFile(d.installPath, backupPath); err != nil {
+		return nil, fmt.Errorf("failed to create backup: %w", err)
+	}
+
+	// Make backup executable
+	if err := os.Chmod(backupPath, 0755); err != nil {
+		return nil, fmt.Errorf("failed to set backup permissions: %w", err)
+	}
+
+	// Get current version
+	version, _ := d.GetVersion()
+
+	info := &RollbackInfo{
+		Path:      backupPath,
+		Version:   version,
+		Timestamp: time.Now(),
+	}
+
+	return info, nil
+}
+
+// copyFile copies a file from src to dst
+func copyFile(src, dst string) error {
+	// Read source file
+	data, err := os.ReadFile(src)
+	if err != nil {
+		return err
+	}
+
+	// Write to destination
+	return os.WriteFile(dst, data, 0644)
+}
+
+// Rollback restores from a backup
+func (d *Dvergar) Rollback(backupPath string) error {
+	// Verify backup exists
+	if _, err := os.Stat(backupPath); err != nil {
+		return fmt.Errorf("backup not found: %w", err)
+	}
+
+	// Create backup of current installation before rollback
+	if d.IsInstalled() {
+		_, err := d.CreateBackup()
+		if err != nil {
+			// Log warning but continue with rollback
+			fmt.Printf("Warning: failed to backup current installation: %v\n", err)
+		}
+	}
+
+	// Copy backup to installation path
+	if err := copyFile(backupPath, d.installPath); err != nil {
+		return fmt.Errorf("failed to restore backup: %w", err)
+	}
+
+	// Make executable
+	if err := os.Chmod(d.installPath, 0755); err != nil {
+		return fmt.Errorf("failed to set permissions: %w", err)
+	}
+
+	return nil
+}
+
+// RollbackToLatest rolls back to the most recent backup
+func (d *Dvergar) RollbackToLatest() error {
+	backups, err := d.ListBackups()
+	if err != nil {
+		return err
+	}
+
+	if len(backups) == 0 {
+		return fmt.Errorf("no backups available")
+	}
+
+	return d.Rollback(backups[0].Path)
+}
+
+// GetRollbackScriptPath returns the path to the rollback script
+func (d *Dvergar) GetRollbackScriptPath() string {
+	return filepath.Join(d.backupPath, "rollback.sh")
+}
+
+// WriteRollbackScript writes a rollback script to disk
+func (d *Dvergar) WriteRollbackScript() error {
+	script := fmt.Sprintf(`#!/usr/bin/env bash
+# ODIN AI Rollback Script
+# Generated by Dvergar
+
+set -e
+
+BACKUP_DIR="%s"
+INSTALL_PATH="%s"
+LOG_FILE="%s"
+
+log() {
+    echo "[ODIN] $1" | tee -a "$LOG_FILE"
+}
+
+log "Starting rollback..."
+
+LATEST=$(ls -t "$BACKUP_DIR"/odin-backup-* 2>/dev/null | head -1)
+
+if [ -z "$LATEST" ]; then
+    log "ERROR: No backup found"
+    exit 1
+fi
+
+log "Rolling back to: $LATEST"
+
+# Backup current before rollback
+if [ -f "$INSTALL_PATH" ]; then
+    cp "$INSTALL_PATH" "$INSTALL_PATH.backup-$(date +%%Y%%m%%d-%%H%%M%%S)"
+fi
+
+# Restore backup
+cp "$LATEST" "$INSTALL_PATH"
+chmod +x "$INSTALL_PATH"
+
+log "Rollback complete!"
+log "Run 'odin version' to verify"
+`, d.backupPath, d.installPath, filepath.Join(d.logPath, "rollback.log"))
+
+	scriptPath := d.GetRollbackScriptPath()
+
+	if err := os.MkdirAll(filepath.Dir(scriptPath), 0755); err != nil {
+		return fmt.Errorf("failed to create script directory: %w", err)
+	}
+
+	if err := os.WriteFile(scriptPath, []byte(script), 0755); err != nil {
+		return fmt.Errorf("failed to write rollback script: %w", err)
+	}
+
+	return nil
+}
+
+// AutoRollbackOnFailure is called after a failed upgrade to automatically restore
+func (d *Dvergar) AutoRollbackOnFailure() error {
+	backups, err := d.ListBackups()
+	if err != nil {
+		return fmt.Errorf("failed to list backups: %w", err)
+	}
+
+	if len(backups) < 2 {
+		// Need at least one backup to rollback to (current + 1 previous)
+		return fmt.Errorf("insufficient backups for automatic rollback")
+	}
+
+	// Rollback to the second most recent (the one before the failed upgrade)
+	return d.Rollback(backups[1].Path)
+}
