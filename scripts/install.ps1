@@ -48,7 +48,7 @@ function Write-Step   { param([string]$Message) Write-Host "`n==> $Message" -For
 function Stop-WithError {
     param([string]$Message)
     Write-Err $Message
-    exit 1
+    throw $Message
 }
 
 # ============================================================================
