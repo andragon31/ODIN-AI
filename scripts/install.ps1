@@ -10,10 +10,10 @@
 
 .EXAMPLE
     # Ejecutar directamente:
-    irm https://raw.githubusercontent.com/andRagon31/ODIN-AI/main/scripts/install.ps1 | iex
+    irm https://raw.githubusercontent.com/andragon31/ODIN-AI/main/scripts/install.ps1 | iex
 
     # O descargar y ejecutar:
-    Invoke-WebRequest -Uri https://raw.githubusercontent.com/andRagon31/ODIN-AI/main/scripts/install.ps1 -OutFile install.ps1
+    Invoke-WebRequest -Uri https://raw.githubusercontent.com/andragon31/ODIN-AI/main/scripts/install.ps1 -OutFile install.ps1
     .\install.ps1
 
     # Forzar método específico:
@@ -31,7 +31,7 @@ param(
 
 $ErrorActionPreference = "Stop"
 
-$GITHUB_OWNER = "andRagon31"
+$GITHUB_OWNER = "andragon31"
 $GITHUB_REPO = "ODIN-AI"
 $BINARY_NAME = "odin"
 

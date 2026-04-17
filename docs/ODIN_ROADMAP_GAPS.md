@@ -136,12 +136,12 @@ internal/guardian — unit tests PASS
 ## Instalador Remoto
 
 ```powershell
-irm https://raw.githubusercontent.com/andRagon31/ODIN-AI/main/scripts/install.ps1 | iex
+irm https://raw.githubusercontent.com/andragon31/ODIN-AI/main/scripts/install.ps1 | iex
 ```
 
 El instalador soporta:
 - **Method auto** (default): descarga binario pre-compilado desde GitHub Releases
-- **Method go**: `go install github.com/andRagon31/odin-ai/cmd/odin@latest`
+- **Method go**: `go install github.com/andragon31/odin-ai/cmd/odin@latest`
 - **Method binary**: fuerza descarga directa
 - Verificación SHA256 via checksums.txt
 - Detección de plataforma (amd64, arm64)
