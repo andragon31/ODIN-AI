@@ -32,6 +32,8 @@ jobs:
           - os: windows-latest
             target: windows-amd64
 
+    outputs:
+      version: ${{ steps.version.outputs.VERSION }}
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -43,11 +45,16 @@ jobs:
 
       - name: Get version
         id: version
+        shell: bash
         run: |
-          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
-            VERSION="${{ inputs.version }}"
+          if [[ "${{ github.event_name }}" == "workflow_dispatch" ]]; then
+            VERSION="${{ github.event.inputs.version }}"
           else
             VERSION="${GITHUB_REF#refs/tags/v}"
+          fi
+          
+          if [[ -z "$VERSION" || "$VERSION" == "refs/tags/"* ]]; then
+            VERSION="0.1.0-dev"
           fi
           echo "VERSION=$VERSION" >> $GITHUB_OUTPUT
           echo "TARGET=${{ matrix.target }}" >> $GITHUB_OUTPUT
@@ -73,18 +80,15 @@ jobs:
           
           if [[ "$TARGET" == windows-* ]]; then
              ARCHIVE_FILENAME="${ARCHIVE_NAME}.zip"
-             zip "$ARCHIVE_FILENAME" "$BINARY_NAME$EXT"
+             # Use 7z on windows runner
+             7z a -tzip "$ARCHIVE_FILENAME" "$BINARY_NAME$EXT"
           else
              ARCHIVE_FILENAME="${ARCHIVE_NAME}.tar.gz"
              tar -czf "$ARCHIVE_FILENAME" "$BINARY_NAME"
           fi
           
           # Generate individual checksum
-          if [[ "$TARGET" == windows-* ]]; then
-            sha256sum "$ARCHIVE_FILENAME" > checksums.txt
-          else
-            sha256sum "$ARCHIVE_FILENAME" > checksums.txt
-          fi
+          sha256sum "$ARCHIVE_FILENAME" > checksums.txt
           
           echo "ARCHIVE=$ARCHIVE_FILENAME" >> $GITHUB_OUTPUT
 
@@ -107,15 +111,16 @@ jobs:
 
       - name: Get version
         id: version
+        shell: bash
         run: |
-          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
-            VERSION="${{ inputs.version }}"
-          else
-            VERSION="${GITHUB_REF#refs/tags/v}"
+          VERSION="${GITHUB_REF#refs/tags/v}"
+          if [[ -z "$VERSION" || "$VERSION" == "refs/tags/"* ]]; then
+            VERSION="0.1.0-dev"
           fi
           echo "VERSION=$VERSION" >> $GITHUB_OUTPUT
 
       - name: Create artifact
+        shell: bash
         run: |
           sed "s/INSTALL_SCRIPT_VERSION=\".*\"/INSTALL_SCRIPT_VERSION=\"${{ steps.version.outputs.VERSION }}\"/" install.sh > install.sh.tmp
           mv install.sh.tmp install.sh

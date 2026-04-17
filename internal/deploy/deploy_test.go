@@ -210,7 +210,7 @@ func TestExpandPath(t *testing.T) {
 	}{
 		{"", ""},
 		{"/usr/local/bin", "/usr/local/bin"},
-		{"~/.local/bin", homeDir + "/.local/bin"},
+		{"~/.local/bin", filepath.Join(homeDir, ".local", "bin")},
 	}
 
 	for _, tt := range tests {
