@@ -259,6 +259,7 @@ function Install-ViaBinary {
         $destPath = Join-Path $installDir "$BINARY_NAME.exe"
         Write-Info "Installing to $destPath..."
         Copy-Item -Path $binaryPath -Destination $destPath -Force
+        Unblock-File -Path $destPath
 
         Write-Success "Installed $BINARY_NAME to $destPath"
 
