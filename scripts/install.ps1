@@ -93,14 +93,13 @@ function Test-Prerequisites {
     Write-Step "Checking prerequisites"
 
     $missing = @()
-    if (-not (Get-Command "curl" -ErrorAction SilentlyContinue)) { $missing += "curl" }
-    if (-not (Get-Command "git" -ErrorAction SilentlyContinue))  { $missing += "git" }
+    if (-not (Get-Command "git" -ErrorAction SilentlyContinue)) { $missing += "git" }
 
     if ($missing.Count -gt 0) {
         Stop-WithError "Missing required tools: $($missing -join ', '). Please install them and try again."
     }
 
-    Write-Success "curl and git are available"
+    Write-Success "git is available"
 }
 
 # ============================================================================
@@ -115,9 +114,7 @@ function Get-InstallMethod {
         return $Forced
     }
 
-    Write-Step "Detecting best install method"
-
-    Write-Info "Will download pre-built binary from GitHub Releases"
+    Write-Info "Will use binary with source fallback"
     return "binary"
 }
 
@@ -160,14 +157,14 @@ function Get-LatestVersion {
     $url = "https://api.github.com/repos/$GITHUB_OWNER/$GITHUB_REPO/releases/latest"
 
     try {
-        $response = Invoke-RestMethod -Uri $url -Headers @{ "User-Agent" = "odin-installer" }
+        $response = Invoke-RestMethod -Uri $url -Headers @{ "User-Agent" = "odin-installer" } -TimeoutSec 15
     } catch {
-        Stop-WithError "Failed to fetch latest release. Rate limited? Try again later or use -Method go"
+        return $null
     }
 
     $version = $response.tag_name
     if (-not $version) {
-        Stop-WithError "Could not determine latest version from GitHub API response"
+        return $null
     }
 
     Write-Success "Latest version: $version"
@@ -180,6 +177,13 @@ function Install-ViaBinary {
     Write-Step "Installing pre-built binary"
 
     $version = Get-LatestVersion
+
+    if (-not $version) {
+        Write-Warn "No GitHub release found. Building from source..."
+        Install-ViaSource
+        return
+    }
+
     $versionNumber = $version.TrimStart("v")
 
     $archiveName = "${BINARY_NAME}_${versionNumber}_windows_${Arch}.zip"
@@ -192,11 +196,13 @@ function Install-ViaBinary {
     try {
         Write-Info "Downloading $archiveName..."
         $archivePath = Join-Path $tmpDir $archiveName
-        Invoke-WebRequest -Uri $downloadUrl -OutFile $archivePath -UseBasicParsing
+        Invoke-WebRequest -Uri $downloadUrl -OutFile $archivePath -UseBasicParsing -TimeoutSec 60
 
         $fileSize = (Get-Item $archivePath).Length
         if ($fileSize -lt 1000) {
-            Stop-WithError "Downloaded file is suspiciously small ($fileSize bytes). Archive may not exist for this platform."
+            Write-Warn "Downloaded file too small. Building from source..."
+            Install-ViaSource
+            return
         }
         Write-Success "Downloaded $archiveName ($fileSize bytes)"
 
@@ -212,7 +218,9 @@ function Install-ViaBinary {
                 $actualChecksum = (Get-FileHash -Path $archivePath -Algorithm SHA256).Hash.ToLower()
 
                 if ($actualChecksum -ne $expectedChecksum) {
-                    Stop-WithError "Checksum mismatch!`n  Expected: $expectedChecksum`n  Got:      $actualChecksum"
+                    Write-Warn "Checksum mismatch. Building from source..."
+                    Install-ViaSource
+                    return
                 }
                 Write-Success "Checksum verified"
             } else {
@@ -227,7 +235,12 @@ function Install-ViaBinary {
 
         $binaryPath = Join-Path $tmpDir "$BINARY_NAME.exe"
         if (-not (Test-Path $binaryPath)) {
-            Stop-WithError "Binary '$BINARY_NAME.exe' not found in archive"
+            $binaryPath = Join-Path $tmpDir "bin\$BINARY_NAME.exe"
+        }
+        if (-not (Test-Path $binaryPath)) {
+            Write-Warn "Binary not found in archive. Building from source..."
+            Install-ViaSource
+            return
         }
 
         $installDir = $InstallDir
@@ -254,6 +267,39 @@ function Install-ViaBinary {
         }
     } finally {
         Remove-Item -Path $tmpDir -Recurse -Force -ErrorAction SilentlyContinue
+    }
+}
+
+function Install-ViaSource {
+    Write-Step "Building from source"
+
+    if (-not (Get-Command "go" -ErrorAction SilentlyContinue)) {
+        Stop-WithError "Go is required to build from source. Install Go from https://go.dev/dl/"
+    }
+
+    $INSTALL_ROOT = Join-Path $HOME ".odin"
+    $INSTALL_BIN = Join-Path $INSTALL_ROOT "bin"
+
+    if (-not (Test-Path $INSTALL_BIN)) {
+        New-Item -ItemType Directory -Path $INSTALL_BIN -Force | Out-Null
+    }
+
+    $sourcePath = "./cmd/odin"
+    $binaryPath = Join-Path $INSTALL_BIN "$BINARY_NAME.exe"
+
+    Write-Info "Compiling..."
+    & go build -o $binaryPath $sourcePath
+    if ($LASTEXITCODE -ne 0) {
+        Stop-WithError "Failed to compile ODIN. Check that source exists at $sourcePath"
+    }
+
+    Write-Success "Binary compiled and installed at $binaryPath"
+
+    if ($env:PATH -notlike "*$INSTALL_BIN*") {
+        $userPath = [Environment]::GetEnvironmentVariable("PATH", "User")
+        $newPath = "$userPath;$INSTALL_BIN"
+        [Environment]::SetEnvironmentVariable("PATH", $newPath, "User")
+        Write-Warn "Added $INSTALL_BIN to PATH. Restart your terminal."
     }
 }
 
