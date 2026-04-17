@@ -10,6 +10,8 @@ import (
 	"time"
 
 	"github.com/google/uuid"
+	"github.com/odin-ai/odin/internal/config"
+	"github.com/odin-ai/odin/internal/memory"
 	"github.com/odin-ai/odin/pkg/logger"
 )
 
@@ -18,38 +20,80 @@ type SDDPhase string
 
 const (
 	PhaseProposal SDDPhase = "proposal"
-	PhaseSpec     SDDPhase = "spec"
-	PhaseDesign   SDDPhase = "design"
-	PhaseTasks    SDDPhase = "tasks"
-	PhaseApply    SDDPhase = "apply"
-	PhaseVerify   SDDPhase = "verify"
-	PhaseArchive  SDDPhase = "archive"
+	PhaseDomain   SDDPhase = "domain"   // DDD: Domain Modeling
+	PhaseContract SDDPhase = "contract" // CFD: Contract Definition
+	PhaseSpec     SDDPhase = "spec"     // BDD: Requirements
+	PhaseDesign   SDDPhase = "design"   // Architecture
+	PhaseTasks    SDDPhase = "tasks"    // Breakdown
+	PhaseApply    SDDPhase = "apply"    // TDD Implementation
+	PhaseVerify   SDDPhase = "verify"   // Validation
+	PhaseDeploy   SDDPhase = "deploy"   // Dvergar: Consultative Deployment
+	PhaseArchive  SDDPhase = "archive"  // Completion
 )
 
-// PhaseOrder defines the ordering of SDD phases
-var PhaseOrder = []SDDPhase{
-	PhaseProposal,
-	PhaseSpec,
-	PhaseDesign,
-	PhaseTasks,
-	PhaseApply,
-	PhaseVerify,
-	PhaseArchive,
+const (
+	MethodologyStandard  = "standard"
+	MethodologyTriad     = "triad"
+	MethodologyPentakill = "pentakill"
+)
+
+// GetPhaseOrder returns the ordered list of phases for a given methodology
+func GetPhaseOrder(methodology string) []SDDPhase {
+	switch methodology {
+	case MethodologyPentakill:
+		return []SDDPhase{
+			PhaseProposal,
+			PhaseDomain,
+			PhaseContract,
+			PhaseSpec,
+			PhaseDesign,
+			PhaseTasks,
+			PhaseApply,
+			PhaseVerify,
+			PhaseDeploy,
+			PhaseArchive,
+		}
+	case MethodologyTriad:
+		return []SDDPhase{
+			PhaseProposal,
+			PhaseSpec,
+			PhaseDesign,
+			PhaseTasks,
+			PhaseApply,
+			PhaseVerify,
+			PhaseArchive,
+		}
+	default:
+		return []SDDPhase{
+			PhaseProposal,
+			PhaseSpec,
+			PhaseDesign,
+			PhaseTasks,
+			PhaseApply,
+			PhaseVerify,
+			PhaseArchive,
+		}
+	}
 }
 
-// NextPhase returns the next phase after the current one
-func NextPhase(current SDDPhase) SDDPhase {
-	for i, phase := range PhaseOrder {
-		if phase == current && i < len(PhaseOrder)-1 {
-			return PhaseOrder[i+1]
+// NextPhase returns the next phase after the current one based on methodology
+func NextPhase(current SDDPhase, methodology string) SDDPhase {
+	order := GetPhaseOrder(methodology)
+	for i, phase := range order {
+		if phase == current && i < len(order)-1 {
+			return order[i+1]
 		}
 	}
 	return current
 }
 
-// IsValidPhase checks if a string is a valid SDD phase
+// IsValidPhase checks if a string is a valid SDD phase for any methodology
 func IsValidPhase(phase string) bool {
-	for _, p := range PhaseOrder {
+	allPhases := []SDDPhase{
+		PhaseProposal, PhaseDomain, PhaseContract, PhaseSpec,
+		PhaseDesign, PhaseTasks, PhaseApply, PhaseVerify, PhaseDeploy, PhaseArchive,
+	}
+	for _, p := range allPhases {
 		if string(p) == phase {
 			return true
 		}
@@ -62,7 +106,8 @@ type Session struct {
 	ID          string            `json:"id"`
 	ChangeName  string            `json:"change_name"`
 	Phase       SDDPhase          `json:"phase"`
-	Status      string            `json:"status"` // "active", "paused", "completed"
+	Methodology string            `json:"methodology"` // "standard", "triad", "pentakill"
+	Status      string            `json:"status"`      // "active", "paused", "completed"
 	CreatedAt   time.Time         `json:"created_at"`
 	UpdatedAt   time.Time         `json:"updated_at"`
 	SnapshotRef string            `json:"snapshot_ref"` // Git commit SHA
@@ -84,11 +129,15 @@ func NewSessionStore(sessionsPath string) (*SessionStore, error) {
 }
 
 // Create creates a new session
-func (s *SessionStore) Create(changeName, description string) (*Session, error) {
+func (s *SessionStore) Create(changeName, description, methodology string) (*Session, error) {
+	if methodology == "" {
+		methodology = "standard"
+	}
 	session := &Session{
 		ID:          uuid.New().String(),
 		ChangeName:  changeName,
 		Phase:       PhaseProposal,
+		Methodology: methodology,
 		Status:      "active",
 		CreatedAt:   time.Now(),
 		UpdatedAt:   time.Now(),
@@ -187,6 +236,9 @@ type Orchestrator struct {
 	sessionsPath   string
 	currentSession *Session
 	store          *SessionStore
+	mimir          *memory.Store
+	guardian       *HeimdallGuardian
+	config         *config.Config
 }
 
 // NewOrchestrator creates a new orchestrator
@@ -196,10 +248,18 @@ func NewOrchestrator(sessionsPath string) (*Orchestrator, error) {
 		return nil, err
 	}
 
-	return &Orchestrator{
+	mimir, err := memory.NewStore(nil) // Uses default config (with global DB path)
+	if err != nil {
+		logger.Warn("Failed to initialize Mimir in orchestrator", "error", err)
+	}
+
+	o := &Orchestrator{
 		sessionsPath: sessionsPath,
 		store:        store,
-	}, nil
+		mimir:        mimir,
+	}
+	o.guardian = NewHeimdallGuardian(o)
+	return o, nil
 }
 
 // CurrentSession returns the current active session
@@ -213,8 +273,8 @@ func (o *Orchestrator) SetCurrentSession(session *Session) {
 }
 
 // CreateSession creates a new SDD session
-func (o *Orchestrator) CreateSession(changeName, description string) (*Session, error) {
-	session, err := o.store.Create(changeName, description)
+func (o *Orchestrator) CreateSession(changeName, description, methodology string) (*Session, error) {
+	session, err := o.store.Create(changeName, description, methodology)
 	if err != nil {
 		return nil, err
 	}
@@ -279,7 +339,7 @@ func (o *Orchestrator) AdvancePhase(id string) (*Session, error) {
 		return nil, fmt.Errorf("session is not active")
 	}
 
-	nextPhase := NextPhase(session.Phase)
+	nextPhase := NextPhase(session.Phase, session.Methodology)
 	if nextPhase == session.Phase {
 		return nil, fmt.Errorf("already at final phase")
 	}
@@ -297,7 +357,7 @@ func (o *Orchestrator) AdvancePhase(id string) (*Session, error) {
 	return session, nil
 }
 
-// CompleteSession marks a session as completed
+// CompleteSession marks a session as completed and archives to global memory
 func (o *Orchestrator) CompleteSession(id string) error {
 	session, err := o.store.Load(id)
 	if err != nil {
@@ -307,6 +367,26 @@ func (o *Orchestrator) CompleteSession(id string) error {
 	session.Status = "completed"
 	if err := o.store.Save(session); err != nil {
 		return err
+	}
+
+	// Archive to Global Memory (Mimir)
+	if o.mimir != nil {
+		discovery := &memory.Memory{
+			Content: fmt.Sprintf("Completed change: %s. Description: %s", session.ChangeName, session.Description),
+			Project: session.ChangeName,
+			Tags:    []string{"archive", "discovery", "session_complete"},
+			Metadata: map[string]interface{}{
+				"id":          session.ID,
+				"description": session.Description,
+				"methodology": session.Methodology,
+				"timestamp":   time.Now().Format(time.RFC3339),
+			},
+		}
+		if err := o.mimir.StoreGlobal(discovery); err != nil {
+			logger.Warn("Failed to archive session to global memory", "id", id, "error", err)
+		} else {
+			logger.Info("Session archived to Mimir Global", "id", id)
+		}
 	}
 
 	if o.currentSession != nil && o.currentSession.ID == id {

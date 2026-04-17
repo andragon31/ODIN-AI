@@ -7,6 +7,8 @@ import (
 	"path/filepath"
 	"sync"
 	"time"
+
+	"github.com/odin-ai/odin/pkg/logger"
 )
 
 // State handles persistence of orchestrator state

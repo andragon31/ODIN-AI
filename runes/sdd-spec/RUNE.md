@@ -14,9 +14,19 @@ Use this rune when:
 ## What You Receive
 
 - Change name
+- Methodology (`standard | triad | pentakill`)
 - Artifact store mode (`engram | openspec | hybrid | none`)
 
 ## Workflow
+
+### Step 0: Methodology Check
+
+Check the methodology of the session:
+- If **Methodology: triad**: Read [sdd-triad-protocol.md](file:///c:/Users/Premium%20Computers/OneDrive/Documentos/GitHub/ODIN/runes/_shared/sdd-triad-protocol.md). BDD becomes MANDATORY.
+- If **Methodology: pentakill**: Read [sdd-pentakill-protocol.md](file:///c:/Users/Premium%20Computers/OneDrive/Documentos/GitHub/ODIN/runes/_shared/sdd-pentakill-protocol.md). 
+    - MUST read `openspec/domain/` to use Ubiquitous Language.
+    - MUST read `openspec/contracts/` to align with technical limits.
+    - BDD scenarios MUST use Domain terms.
 
 ### Step 1: Identify Affected Domains
 
@@ -133,3 +143,44 @@ Why copy-full-then-edit?
 - **openspec**: Write to `openspec/changes/{change-name}/specs/`
 - **hybrid**: Both
 - **none**: Return result only
+
+## BDD Feature File Template (Required Deliverable)
+
+When the change requires BDD testing (e.g., integration tests with godog), you MUST also generate a Feature file:
+
+```
+Feature: {Capability Name}
+
+  {Short description of what this feature does.}
+
+  Background:
+    Given the system is initialized
+    And {precondition 1}
+    And {precondition 2}
+
+  Scenario: {Happy path scenario name}
+    Given {precondition}
+    When {action}
+    Then {outcome}
+    And {verification}
+
+  Scenario: {Edge case scenario name}
+    Given {precondition}
+    When {action with edge case}
+    Then {outcome for edge case}
+    And {verification}
+
+  Scenario: {Error handling scenario}
+    Given {invalid state}
+    When {action that should fail}
+    Then {error message}
+    And {system state unchanged}
+```
+
+**When to generate Feature files (REQUIRED):**
+- **MODE TRIAD/PENTAKILL: ALWAYS mandatory.** One `.feature` file per domain or capability.
+- MODE STANDARD: Mandatory for changes affecting multi-component workflows or modifying integration behavior.
+- ALWAYS generate quando o usuário solicitar BDD explicitamente.
+- Feature files go in: `openspec/features/{change-name}/{capability}.feature`
+
+**Storage:** `openspec/features/{change-name}/{capability}.feature`

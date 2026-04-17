@@ -14,9 +14,16 @@ Use this rune when:
 ## What You Receive
 
 - Change name
+- Methodology (`standard | triad`)
 - Artifact store mode (`engram | openspec | hybrid | none`)
 
 ## Workflow
+
+### Step 0: Methodology Check
+
+Check the methodology of the session:
+- If **Methodology: triad**: Read [sdd-triad-protocol.md](file:///c:/Users/Premium%20Computers/OneDrive/Documentos/GitHub/ODIN/runes/_shared/sdd-triad-protocol.md) before starting.
+- All implementation tasks MUST follow the TDD Cycle (Red-Green-Refactor).
 
 ### Step 1: Analyze the Design
 
@@ -91,13 +98,18 @@ Phase 5: Cleanup (if needed)
 
 ## Rules
 
-- ALWAYS reference concrete file paths in tasks
-- Tasks MUST be ordered by dependency — Phase 1 tasks shouldn't depend on Phase 2
-- Testing tasks should reference specific scenarios from the specs
-- Each task should be completable in ONE session
+- ALWAYS reference concrete file paths in tasks.
+- **MODE TRIAD: Implementation tasks MUST be broken down by the Red-Green-Refactor cycle.**
+    - Example:
+        - [ ] 2.1 [TDD: RED] Create failing test in `internal/pkg/logic_test.go` for requirement REQ-01.
+        - [ ] 2.2 [TDD: GREEN] Implement minimal logic in `internal/pkg/logic.go` to satisfy test 2.1.
+        - [ ] 2.3 [TDD: REFACTOR] Optimize and clean `internal/pkg/logic.go`.
+- Tasks MUST be ordered by dependency — Phase 1 tasks shouldn't depend on Phase 2.
+- Testing tasks should reference specific scenarios from the specs.
+- Each task should be completable in ONE session.
 - Use hierarchical numbering: 1.1, 1.2, 2.1, 2.2, etc.
-- NEVER include vague tasks like "implement feature" or "add tests"
-- **Size budget**: Tasks artifact MUST be under 530 words
+- NEVER include vague tasks like "implement feature" or "add tests".
+- **Size budget**: Tasks artifact MUST be under 530 words.
 
 ## Persistence
 

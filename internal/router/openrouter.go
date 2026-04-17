@@ -6,22 +6,23 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"github.com/odin-ai/odin/internal/config"
 )
 
 // OpenRouterProvider is a provider for OpenRouter models
 type OpenRouterProvider struct {
-	config OpenRouterConfig
+	config config.OpenRouterConfig
 	client *http.Client
 }
 
 // NewOpenRouterProvider creates a new OpenRouter provider
-func NewOpenRouterProvider(config OpenRouterConfig) *OpenRouterProvider {
-	if config.Endpoint == "" {
-		config.Endpoint = DefaultOpenRouterEndpoint
+func NewOpenRouterProvider(cfg config.OpenRouterConfig) *OpenRouterProvider {
+	if cfg.Endpoint == "" {
+		cfg.Endpoint = config.DefaultOpenRouterEndpoint
 	}
 
 	return &OpenRouterProvider{
-		config: config,
+		config: cfg,
 		client: &http.Client{
 			Timeout: Timeout,
 		},

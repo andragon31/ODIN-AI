@@ -15,6 +15,7 @@ Use this rune when:
 
 - Change name
 - The specific task(s) to implement
+- Methodology (`standard | triad | pentakill`)
 - Artifact store mode (`engram | openspec | hybrid | none`)
 
 ## Workflow
@@ -42,7 +43,9 @@ Before starting work, check for existing apply-progress:
 3. Skip those tasks — start from the first incomplete task
 4. When saving, MERGE: include all previously completed tasks PLUS your newly completed tasks
 
-### Step 4: Implement Tasks (Standard Workflow)
+### Step 4: Implement Tasks (Workflow Selection)
+
+#### Option A: Methodology Standard
 
 ```
 FOR EACH TASK:
@@ -53,6 +56,32 @@ FOR EACH TASK:
 ├── Write the code
 ├── Mark task as complete [x] in tasks.md
 └── Note any issues or deviations
+```
+
+#### Option B: Methodology Triad (Red-Green-Refactor)
+
+#### Option C: Methodology Pentakill (The Ultimate Cycle)
+
+```
+FOR EACH TASK:
+├── 0. CONTRACT CHECK: Verify task vs openspec/contracts/
+│   └── Ensure parameter names, types, and return codes match.
+├── 1. RED: Write the test first
+│   ├── Target: {file}_test.go
+│   ├── Goal: Fail because feature is missing
+│   └── RUN: go test -v {file}_test.go
+├── 2. GREEN: Implement minimal logic
+│   ├── Target: {file}.go
+│   ├── Goal: Pass the specific test from step 1
+│   ├── DOMAIN CHECK: Ensure naming and logic follow openspec/domain/domain.md
+│   └── RUN: go test -v {file}_test.go (MUST PASS)
+├── 3. REFACTOR: Clean and Optimize
+│   ├── Target: {file}.go
+│   ├── Goal: Match project patterns, DRY, SOLID
+│   └── RUN: go test -v {file}_test.go (MUST STILL PASS)
+├── 4. BDD Verify:
+│   └── Check if this task satisfies a .feature scenario
+└── 5. COMPLETE: Mark task [x] in tasks.md
 ```
 
 ### Step 5: Mark Tasks Complete
@@ -77,9 +106,18 @@ Follow persistence-contract.md:
 #### Merge Protocol
 
 When saving apply-progress:
-1. Include ALL previously completed tasks (copy their status)
-2. PLUS your new completions
-3. Format: keep the same structure but ensure no completed task is lost
+1. Include ALL previously completed tasks (copy their status).
+2. PLUS your new completions.
+3. **MODE TRIAD**: Note the test result (PASS/FAIL) for each TDD task.
+4. Format: keep the same structure but ensure no completed task is lost.
+
+## Implementation Rules (TRIAD MODE)
+
+- **NEVER write application code before a test in Triad Mode.**
+- Every `[TDD: RED]` task MUST be followed by a test execution evidence showing failure.
+- Every `[TDD: GREEN]` task MUST be followed by a test execution evidence showing pass.
+- **MODE TRIAD/PENTAKILL**: BDD Scenario coverage is the ultimate metric for success.
+- **MODE PENTAKILL**: **Contract-Violating code is forbidden.** If the code deviates from the contract, fix the contract BEFORE the code.
 
 ## Implementation Rules
 

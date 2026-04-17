@@ -54,8 +54,8 @@ func (s *Store) AdvancedSearch(query string, opts *SearchOptions) ([]SearchResul
 			return nil, fmt.Errorf("search failed: %w", err)
 		}
 	} else {
-		// No query, just filter all memories
-		memories, err := s.db.ListMemories(opts.Project)
+		// No query, just filter all memories from both layers
+		memories, err := s.ListMemories(opts.Project)
 		if err != nil {
 			return nil, fmt.Errorf("failed to list memories: %w", err)
 		}
@@ -184,7 +184,7 @@ func (s *Store) SearchByTags(tags []string, matchAll bool, limit int) ([]*Memory
 		limit = 10
 	}
 
-	memories, err := s.db.ListMemories("")
+	memories, err := s.ListMemories("")
 	if err != nil {
 		return nil, fmt.Errorf("failed to list memories: %w", err)
 	}
@@ -236,7 +236,7 @@ func (s *Store) SearchByProject(project string, limit int) ([]*Memory, error) {
 		limit = 10
 	}
 
-	memories, err := s.db.ListMemories(project)
+	memories, err := s.ListMemories(project)
 	if err != nil {
 		return nil, fmt.Errorf("failed to list memories: %w", err)
 	}
@@ -253,7 +253,7 @@ func (s *Store) SearchByDateRange(since, until time.Time, limit int) ([]*Memory,
 		limit = 10
 	}
 
-	memories, err := s.db.ListMemories("")
+	memories, err := s.ListMemories("")
 	if err != nil {
 		return nil, fmt.Errorf("failed to list memories: %w", err)
 	}
@@ -401,45 +401,31 @@ func (s *Store) GetSuggestions(partial string, limit int) ([]SearchSuggestion, e
 		return nil, nil
 	}
 
-	var suggestions []SearchSuggestion
-
-	// Get matching tags
-	_, err := s.db.ListTags()
-	if err == nil {
-		tagCounts := make(map[string]int)
-		memories, _ := s.db.ListMemories("")
-		for _, m := range memories {
-			for _, tag := range m.Tags {
-				tag = strings.TrimSpace(tag)
-				if strings.Contains(strings.ToLower(tag), partial) {
-					tagCounts[tag]++
-				}
-			}
+	tags, _ := s.ListTags()
+	projects := make(map[string]bool)
+	allMemories, _ := s.ListMemories("")
+	for _, m := range allMemories {
+		if m.Project != "" {
+			projects[m.Project] = true
 		}
+	}
 
-		for tag, count := range tagCounts {
+	var suggestions []SearchSuggestion
+	for _, tag := range tags {
+		if strings.Contains(strings.ToLower(tag), partial) {
 			suggestions = append(suggestions, SearchSuggestion{
-				Text:  tag,
-				Type:  "tag",
-				Count: count,
+				Text: tag,
+				Type: "tag",
 			})
 		}
 	}
-
-	// Get matching projects
-	memories, _ := s.db.ListMemories("")
-	projectCounts := make(map[string]int)
-	for _, m := range memories {
-		if m.Project != "" && strings.Contains(strings.ToLower(m.Project), partial) {
-			projectCounts[m.Project]++
+	for p := range projects {
+		if strings.Contains(strings.ToLower(p), partial) {
+			suggestions = append(suggestions, SearchSuggestion{
+				Text: p,
+				Type: "project",
+			})
 		}
-	}
-	for project, count := range projectCounts {
-		suggestions = append(suggestions, SearchSuggestion{
-			Text:  project,
-			Type:  "project",
-			Count: count,
-		})
 	}
 
 	// Limit results
@@ -475,12 +461,10 @@ type TagStats struct {
 func (s *Store) GetAnalytics() (*SearchAnalytics, error) {
 	// This would typically track search history
 	// For now, return basic stats
-	memories, err := s.db.ListMemories("")
+	memories, err := s.ListMemories("")
 	if err != nil {
 		return nil, err
 	}
-
-	_, _ = s.db.ListTags() // Check available tags exist
 
 	analytics := &SearchAnalytics{
 		TotalSearches:      0, // Would be tracked

@@ -5,17 +5,18 @@ import (
 	"os"
 	"path/filepath"
 	"runtime"
+
+	"github.com/odin-ai/odin/internal/config"
 )
 
-// CursorModel represents a detected Cursor model
-type CursorModel struct {
-	Name        string `json:"name"`
-	Provider    string `json:"provider"`
-	DisplayName string `json:"display_name"`
+// CursorDetector implements the Detector interface for Cursor IDE
+type CursorDetector struct{}
+
+func (d *CursorDetector) Name() string {
+	return "Cursor"
 }
 
-// DetectCursorModels finds models configured in Cursor IDE
-func DetectCursorModels() ([]CursorModel, error) {
+func (d *CursorDetector) Detect() (*config.DiscoveryResult, error) {
 	settingsPath, err := getCursorSettingsPath()
 	if err != nil {
 		return nil, err
@@ -24,12 +25,17 @@ func DetectCursorModels() ([]CursorModel, error) {
 	data, err := os.ReadFile(settingsPath)
 	if err != nil {
 		if os.IsNotExist(err) {
-			return []CursorModel{}, nil
+			return nil, nil
 		}
 		return nil, err
 	}
 
-	return parseCursorSettings(data)
+	res, err := parseCursorSettings(data)
+	if err != nil {
+		return nil, err
+	}
+	res.Path = settingsPath
+	return res, nil
 }
 
 // getCursorSettingsPath returns the Cursor settings file path based on OS
@@ -64,22 +70,47 @@ func (e *cursorDetectError) Error() string {
 	return e.message
 }
 
-// parseCursorSettings parses Cursor settings JSON and extracts models
-func parseCursorSettings(data []byte) ([]CursorModel, error) {
+// parseCursorSettings parses Cursor settings JSON and extracts models and keys
+func parseCursorSettings(data []byte) (*config.DiscoveryResult, error) {
 	var settings map[string]json.RawMessage
 	if err := json.Unmarshal(data, &settings); err != nil {
 		return nil, err
 	}
 
-	models := []CursorModel{}
+	res := &config.DiscoveryResult{
+		ToolName: "Cursor",
+		Models:   []config.ToolModel{},
+		APIKeys:  make(map[string]string),
+	}
 
+	// Extract API Keys
+	keyMappings := map[string][]string{
+		"openai":    {"openai.apiKey", "cursor.cpp.openaiApiKey"},
+		"anthropic": {"anthropic.apiKey", "cursor.cpp.anthropicApiKey"},
+		"google":    {"google.apiKey"},
+		"azure":     {"azure.apiKey"},
+	}
+
+	for provider, keys := range keyMappings {
+		for _, key := range keys {
+			if val, ok := settings[key]; ok {
+				var keyVal string
+				if err := json.Unmarshal(val, &keyVal); err == nil && keyVal != "" {
+					res.APIKeys[provider] = keyVal
+					break
+				}
+			}
+		}
+	}
+
+	// Extract Models
 	// Try format 1: cursor.generatedModels / cursor.customModels
 	if generated, ok := settings["cursor.generatedModels"]; ok {
 		parsed, err := parseGeneratedModels(generated)
 		if err != nil {
 			return nil, err
 		}
-		models = append(models, parsed...)
+		res.Models = append(res.Models, parsed...)
 	}
 
 	if custom, ok := settings["cursor.customModels"]; ok {
@@ -87,7 +118,7 @@ func parseCursorSettings(data []byte) ([]CursorModel, error) {
 		if err != nil {
 			return nil, err
 		}
-		models = append(models, parsed...)
+		res.Models = append(res.Models, parsed...)
 	}
 
 	// Try format 2: models.providers (newer Cursor versions)
@@ -96,13 +127,13 @@ func parseCursorSettings(data []byte) ([]CursorModel, error) {
 		if err != nil {
 			return nil, err
 		}
-		models = append(models, parsed...)
+		res.Models = append(res.Models, parsed...)
 	}
 
 	// Remove duplicates based on model name
-	models = deduplicateModels(models)
+	res.Models = deduplicateModels(res.Models)
 
-	return models, nil
+	return res, nil
 }
 
 // generatedModelEntry represents a model entry in cursor.generatedModels
@@ -113,14 +144,14 @@ type generatedModelEntry struct {
 }
 
 // parseGeneratedModels parses the cursor.generatedModels array
-func parseGeneratedModels(data []byte) ([]CursorModel, error) {
+func parseGeneratedModels(data []byte) ([]config.ToolModel, error) {
 	var entries []generatedModelEntry
 	if err := json.Unmarshal(data, &entries); err != nil {
 		// Not an array, try object format
 		var entry generatedModelEntry
 		if err2 := json.Unmarshal(data, &entry); err2 == nil {
 			if entry.Model != "" {
-				return []CursorModel{{
+				return []config.ToolModel{{
 					Name:        entry.Model,
 					Provider:    entry.Provider,
 					DisplayName: entry.DisplayName,
@@ -131,7 +162,7 @@ func parseGeneratedModels(data []byte) ([]CursorModel, error) {
 		return nil, err
 	}
 
-	models := make([]CursorModel, 0, len(entries))
+	models := make([]config.ToolModel, 0, len(entries))
 	for _, e := range entries {
 		if e.Model == "" {
 			continue
@@ -140,7 +171,7 @@ func parseGeneratedModels(data []byte) ([]CursorModel, error) {
 		if displayName == "" {
 			displayName = e.Model
 		}
-		models = append(models, CursorModel{
+		models = append(models, config.ToolModel{
 			Name:        e.Model,
 			Provider:    e.Provider,
 			DisplayName: displayName,
@@ -156,14 +187,14 @@ type customModelEntry struct {
 }
 
 // parseCustomModels parses the cursor.customModels array
-func parseCustomModels(data []byte) ([]CursorModel, error) {
+func parseCustomModels(data []byte) ([]config.ToolModel, error) {
 	var entries []customModelEntry
 	if err := json.Unmarshal(data, &entries); err != nil {
 		// Not an array, try object format
 		var entry customModelEntry
 		if err2 := json.Unmarshal(data, &entry); err2 == nil {
 			if entry.Model != "" {
-				return []CursorModel{{
+				return []config.ToolModel{{
 					Name:        entry.Model,
 					Provider:    entry.Provider,
 					DisplayName: entry.Model,
@@ -174,7 +205,7 @@ func parseCustomModels(data []byte) ([]CursorModel, error) {
 		return nil, err
 	}
 
-	models := make([]CursorModel, 0, len(entries))
+	models := make([]config.ToolModel, 0, len(entries))
 	for _, e := range entries {
 		if e.Model == "" {
 			continue
@@ -183,7 +214,7 @@ func parseCustomModels(data []byte) ([]CursorModel, error) {
 		if provider == "" {
 			provider = "unknown"
 		}
-		models = append(models, CursorModel{
+		models = append(models, config.ToolModel{
 			Name:        e.Model,
 			Provider:    provider,
 			DisplayName: e.Model,
@@ -199,18 +230,18 @@ type modelsSection struct {
 }
 
 // parseModelsSection parses the models object (newer Cursor format)
-func parseModelsSection(data []byte) ([]CursorModel, error) {
+func parseModelsSection(data []byte) ([]config.ToolModel, error) {
 	var section modelsSection
 	if err := json.Unmarshal(data, &section); err != nil {
 		return nil, err
 	}
 
-	models := []CursorModel{}
+	models := []config.ToolModel{}
 
 	// Add primary model
 	if section.Primary != "" {
 		provider := inferProvider(section.Primary)
-		models = append(models, CursorModel{
+		models = append(models, config.ToolModel{
 			Name:        section.Primary,
 			Provider:    provider,
 			DisplayName: section.Primary,
@@ -224,7 +255,7 @@ func parseModelsSection(data []byte) ([]CursorModel, error) {
 			if model == section.Primary {
 				continue
 			}
-			models = append(models, CursorModel{
+			models = append(models, config.ToolModel{
 				Name:        model,
 				Provider:    provider,
 				DisplayName: model,
@@ -300,9 +331,9 @@ func equalFold(a, b string) bool {
 }
 
 // deduplicateModels removes duplicate models based on Name field
-func deduplicateModels(models []CursorModel) []CursorModel {
+func deduplicateModels(models []config.ToolModel) []config.ToolModel {
 	seen := make(map[string]bool)
-	result := []CursorModel{}
+	result := []config.ToolModel{}
 	for _, m := range models {
 		if !seen[m.Name] {
 			seen[m.Name] = true

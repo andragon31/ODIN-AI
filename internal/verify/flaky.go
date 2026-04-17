@@ -204,11 +204,11 @@ func (fd *FlakyDetector) AnalyzeResult(runs []bool) DetectionResult {
 	}
 
 	// Detect pattern
-	if firstFail == 0 && lastFail == len(runs)-1 {
+	if firstFail == 0 && lastFail < len(runs)/2 {
 		result.FailurePattern = "first-fail"
 		result.Message = "test fails on first run then passes"
 		result.Confidence = 0.9
-	} else if lastFail == len(runs)-1 && firstFail > 0 {
+	} else if lastFail == len(runs)-1 && firstFail >= len(runs)/2 {
 		result.FailurePattern = "last-fail"
 		result.Message = "test passes then fails on last run"
 		result.Confidence = 0.9

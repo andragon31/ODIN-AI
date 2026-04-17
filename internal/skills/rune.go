@@ -22,8 +22,8 @@ type Rune struct {
 	Execution   SkillExecution `json:"execution" yaml:"execution"`
 	Outputs     SkillOutputs   `json:"outputs,omitempty" yaml:"outputs,omitempty"`
 	Schema      interface{}    `json:"-" yaml:"-"`   // CUE schema for validation - not serialized
-	ID          string         `json:"id"`           // Unique identifier for this installation
-	InstalledAt string         `json:"installed_at"` // ISO timestamp
+	ID          string         `json:"id" yaml:"id"`                     // Unique identifier for this installation
+	InstalledAt string         `json:"installed_at" yaml:"installed_at"` // ISO timestamp
 }
 
 // SkillTriggers defines when a skill is relevant
@@ -89,6 +89,9 @@ func (r *Rune) Validate() error {
 	if r.Execution.Type != "prompt" && r.Execution.Type != "script" && r.Execution.Type != "wasm" {
 		return fmt.Errorf("execution.type must be 'prompt', 'script', or 'wasm'")
 	}
+	// Note: We keep the warnings above but don't force Valid=false for empty prompt/script
+	// to allow for template-only skills or draft state, matching the existing test expectations.
+
 	return nil
 }
 

@@ -301,7 +301,7 @@ By default, keeps memories with tags: arch, spec, security.`,
 
 			if dryRun {
 				// Dry run mode
-				smartPruner := NewSmartPruner(store.db, keepTags, 0)
+				smartPruner := NewSmartPruner(store.projectDB, keepTags, 0)
 				report, err := smartPruner.PruningDryRun()
 				if err != nil {
 					return fmt.Errorf("dry run failed: %w", err)

@@ -7,22 +7,24 @@ import (
 	"fmt"
 	"net/http"
 	"time"
+
+	"github.com/odin-ai/odin/internal/config"
 )
 
 // OllamaProvider is a provider for local Ollama models
 type OllamaProvider struct {
-	config OllamaConfig
+	config config.OllamaConfig
 	client *http.Client
 }
 
 // NewOllamaProvider creates a new Ollama provider
-func NewOllamaProvider(config OllamaConfig) *OllamaProvider {
-	if config.Endpoint == "" {
-		config.Endpoint = DefaultOllamaEndpoint
+func NewOllamaProvider(cfg config.OllamaConfig) *OllamaProvider {
+	if cfg.Endpoint == "" {
+		cfg.Endpoint = config.DefaultOllamaEndpoint
 	}
 
 	return &OllamaProvider{
-		config: config,
+		config: cfg,
 		client: &http.Client{
 			Timeout: Timeout,
 		},

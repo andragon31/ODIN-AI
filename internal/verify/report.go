@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"os"
+	"runtime"
 	"time"
 )
 
@@ -117,16 +118,6 @@ func (rg *ReportGenerator) ExportJSONToWriter(report *Report, w *os.File) error 
 	return enc.Encode(report)
 }
 
-// ReportSummary holds summary statistics for a report
-type ReportSummary struct {
-	TotalTests        int     `json:"total_tests"`
-	PassedTests       int     `json:"passed_tests"`
-	FailedTests       int     `json:"failed_tests"`
-	FlakyTests        int     `json:"flaky_tests"`
-	PassRate          float64 `json:"pass_rate"`
-	AvgLatencyMs      float64 `json:"avg_latency_ms"`
-	AllBenchmarksPass bool    `json:"all_benchmarks_pass"`
-}
 
 // CompactReport returns a compact summary of the report
 func (rg *ReportGenerator) CompactReport(report *Report) string {

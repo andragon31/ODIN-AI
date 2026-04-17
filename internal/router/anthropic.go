@@ -6,22 +6,23 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"github.com/odin-ai/odin/internal/config"
 )
 
 // AnthropicProvider is a provider for Anthropic models
 type AnthropicProvider struct {
-	config AnthropicConfig
+	config config.AnthropicConfig
 	client *http.Client
 }
 
 // NewAnthropicProvider creates a new Anthropic provider
-func NewAnthropicProvider(config AnthropicConfig) *AnthropicProvider {
-	if config.Endpoint == "" {
-		config.Endpoint = DefaultAnthropicEndpoint
+func NewAnthropicProvider(cfg config.AnthropicConfig) *AnthropicProvider {
+	if cfg.Endpoint == "" {
+		cfg.Endpoint = config.DefaultAnthropicEndpoint
 	}
 
 	return &AnthropicProvider{
-		config: config,
+		config: cfg,
 		client: &http.Client{
 			Timeout: Timeout,
 		},

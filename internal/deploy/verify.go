@@ -72,12 +72,12 @@ func VerifyBinary(binaryPath, signatureURL, certificateURL string) (*VerifyResul
 
 // InstallCosign downloads and installs cosign
 func InstallCosign() error {
-	os := runtime.GOOS
+	osName := runtime.GOOS
 	arch := runtime.GOARCH
 
 	// Determine download URL based on OS/arch
 	var downloadURL string
-	switch os {
+	switch osName {
 	case "linux":
 		downloadURL = fmt.Sprintf(
 			"https://github.com/sigstore/cosign/releases/latest/download/cosign-linux-%s",
@@ -95,18 +95,16 @@ func InstallCosign() error {
 			arch,
 		)
 	default:
-		return fmt.Errorf("unsupported OS: %s", os)
+		return fmt.Errorf("unsupported OS: %s", osName)
 	}
 
 	// Download cosign
 	tmpDir := os.TempDir()
-	cosignPath := filepath.Join(tmpDir, "cosign"+(".exe"[:4*(1<<((^0)>>63))] /* windows */))
-
+	ext := ""
 	if runtime.GOOS == "windows" {
-		cosignPath = filepath.Join(tmpDir, "cosign.exe")
-	} else {
-		cosignPath = filepath.Join(tmpDir, "cosign")
+		ext = ".exe"
 	}
+	cosignPath := filepath.Join(tmpDir, "cosign"+ext)
 
 	// Use curl to download
 	cmd := exec.Command("curl", "-fsSL", downloadURL, "-o", cosignPath)
@@ -162,7 +160,7 @@ func VerifySignatureAgainstRekor(binaryPath string) (*VerifyResult, error) {
 	cmd := exec.CommandContext(context.Background(), "cosign", args...)
 	var stdout, stderr bytes.Buffer
 	cmd.Stdout = &stdout
-	cmd.Stderr = stderr
+	cmd.Stderr = &stderr
 
 	err := cmd.Run()
 	if err != nil {

@@ -100,6 +100,7 @@ Follow the persistence-contract.md:
 - The ONLY file you MAY create is `exploration.md` inside the change folder (if a change name is provided)
 - DO NOT modify any existing code or files
 - ALWAYS read real code, never guess about the codebase
+- **Indagación Proactiva**: Si la petición del usuario es vaga o el alcance es inmenso, DEBES detenerte y solicitar aclaraciones mediante una conversación dinámica. "Explorar" no justifica "Adivinar".
 - Keep your analysis CONCISE - the orchestrator needs a summary, not a novel
 - If you can't find enough information, say so clearly
 - If the request is too vague to explore, say what clarification is needed

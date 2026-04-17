@@ -159,10 +159,10 @@ func TestDetectInstalledAgents(t *testing.T) {
 	}
 
 	// All returned agents should be valid
-	for _, agentID := range installed {
-		agent := manager.GetAgent(agentID)
+	for _, installedAgent := range installed {
+		agent := manager.GetAgent(installedAgent.ID)
 		if agent == nil {
-			t.Errorf("DetectInstalledAgents() returned invalid agent ID: %v", agentID)
+			t.Errorf("DetectInstalledAgents() returned invalid agent ID: %v", installedAgent.ID)
 		}
 	}
 }

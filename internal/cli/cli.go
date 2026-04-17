@@ -70,6 +70,7 @@ Inspirado en Gentleman AI, potenciado para local-first.`,
 		skills.Commands(),
 		deploy.Commands(),
 		verify.Commands(),
+		newTUICmd(),
 		tui.Commands(),
 		migrate.Commands(),
 		plugins.Commands(),
@@ -245,9 +246,10 @@ func runStatus(cmd *cobra.Command) error {
 	fmt.Printf("│  Nornir         %-22s  %-8s all benchmarks pass        │\n", "0 flaky", nornirState)
 	fmt.Println("│                                                                     │")
 	fmt.Println("│  Router:                                                            │")
-	fmt.Printf("│    ollama-local    %-8s (deepseek-coder, nomic-embed-text)       │\n", "OK")
-	fmt.Printf("│    openrouter      %-8s                                       │\n", "OK")
-	fmt.Printf("│    anthropic       %-8s (claude-3-5-sonnet)                      │\n", "OK")
+	fmt.Printf("│    🧠 \033[90mollama-local\033[0m    %-8s (deepseek-coder, nomic-embed-text)       │\n", "OK")
+	fmt.Printf("│    🧠 \033[90mopenrouter\033[0m      %-8s                                       │\n", "OK")
+	fmt.Printf("│    🧠 \033[90manthropic\033[0m       %-8s (claude-3-5-sonnet)                      │\n", "OK")
+	fmt.Printf("│    🧠 \033[90mopenai\033[0m          %-8s (gpt-4o, gpt-4-turbo)                   │\n", "OK")
 	fmt.Println("│                                                                     │")
 	fmt.Println("│  Agents: claude-code OK  gemini-cli OK  cursor WARN               │")
 	fmt.Println("│                                                                     │")
@@ -328,34 +330,23 @@ func newSessionCmd() *cobra.Command {
 	return cmd
 }
 
-// TUIView represents the main TUI view
-type TUIView struct {
-	quitting bool
-}
+// tuiCmd represents the tui command
+func newTUICmd() *cobra.Command {
+	return &cobra.Command{
+		Use:   "tui",
+		Short: "Start ODIN interactive TUI",
+		RunE: func(cmd *cobra.Command, args []string) error {
+			cfg, err := config.Load("")
+			if err != nil {
+				return err
+			}
 
-func NewTUIView() *TUIView {
-	return &TUIView{}
-}
-
-func (t *TUIView) Init() tea.Cmd {
-	return nil
-}
-
-func (t *TUIView) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
-	switch msg := msg.(type) {
-	case tea.KeyMsg:
-		switch msg.String() {
-		case "q", "ctrl+c":
-			t.quitting = true
-			return t, tea.Quit
-		}
+			app := tui.NewApp(cfg)
+			p := tea.NewProgram(app, tea.WithAltScreen())
+			if _, err := p.Run(); err != nil {
+				return fmt.Errorf("failed to run TUI: %w", err)
+			}
+			return nil
+		},
 	}
-	return t, nil
-}
-
-func (t *TUIView) View() string {
-	if t.quitting {
-		return "Goodbye!\n"
-	}
-	return "ODIN AI - Nórdico Local-First\nPress 'q' to quit.\n"
 }

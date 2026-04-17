@@ -67,6 +67,50 @@ test-e2e:
 		echo "${RED}Docker not found. E2E tests require Docker.${NC}"; \
 	fi
 
+## test-bdd: Run BDD/godog tests
+test-bdd:
+	@echo "${YELLOW}Running BDD behavior tests...${NC}"
+	@if command -v godog &> /dev/null; then \
+		cd openspec && godog run features; \
+	else \
+		echo "${RED}godog not installed. Install: go install github.com/cucumber/godog/cmd/godog@latest${NC}"; \
+	fi
+
+## test-race: Run tests with race detector
+test-race:
+	@echo "${YELLOW}Running tests with race detector...${NC}"
+	${GOTEST} -v -race ./...
+
+## test-coverage: Run tests with detailed coverage report
+test-coverage:
+	@echo "${YELLOW}Running tests with coverage...${NC}"
+	${GOTEST} -v -race -coverprofile=${COVERAGE_FILE} -covermode=atomic ./...
+	@mkdir -p ${COVERAGE_DIR}
+	@go tool cover -html=${COVERAGE_FILE} -o ${COVERAGE_DIR}/coverage.html
+	@go tool cover -func=${COVERAGE_FILE} -o ${COVERAGE_DIR}/coverage.txt
+	@echo "${GREEN}Coverage report generated at ${COVERAGE_DIR}/coverage.html${NC}"
+	@echo "${GREEN}Coverage summary at ${COVERAGE_DIR}/coverage.txt${NC}"
+
+## test-all: Run all tests (unit, integration, e2e, race)
+test-all: test-unit test-int test-race
+	@echo "${GREEN}All tests passed!${NC}"
+
+## validate-coverage: Validate coverage meets minimum threshold
+validate-coverage:
+	@echo "${YELLOW}Validating coverage thresholds...${NC}"
+	@if [ ! -f ${COVERAGE_FILE} ]; then \
+		echo "${RED}No coverage file found. Run 'make test-coverage' first.${NC}"; \
+		exit 1; \
+	fi
+	@echo "Checking coverage thresholds..."
+	@MIN_COVERAGE=70; \
+	CUR=$(go tool cover -func=${COVERAGE_FILE} | grep "total:" | awk '{print $$3}' | tr -d '%'); \
+	if [ "$$CUR" -lt "$$MIN_COVERAGE" ]; then \
+		echo "${RED}Coverage $$CUR% is below minimum $$MIN_COVERAGE%${NC}"; \
+		exit 1; \
+	fi
+	@echo "${GREEN}Coverage $$CUR% meets minimum $$MIN_COVERAGE%${NC}"
+
 ## lint: Run linter
 lint:
 	@echo "${YELLOW}Running linter...${NC}"

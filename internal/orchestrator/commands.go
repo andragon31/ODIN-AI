@@ -23,6 +23,7 @@ Völva guides you through the SDD lifecycle.`,
 	}
 
 	cmd.AddCommand(
+		newNewCmd(),
 		newNextCmd(),
 		newStatusCmd(),
 		newSessionListCmd(),
@@ -31,6 +32,60 @@ Völva guides you through the SDD lifecycle.`,
 	)
 
 	return cmd
+}
+func newNewCmd() *cobra.Command {
+	cmd := &cobra.Command{
+		Use:   "new <change>",
+		Short: "Start a new SDD session",
+		Long: `Initialize a new Spec-Driven Development session for a specific change.
+You can choose the methodology (standard, triad, or pentakill).`,
+		Args: cobra.ExactArgs(1),
+		RunE: func(cmd *cobra.Command, args []string) error {
+			return runNew(cmd, args[0])
+		},
+	}
+
+	cmd.Flags().String("description", "", "Description of the change")
+	cmd.Flags().String("methodology", MethodologyStandard, "Methodology for the session (standard|triad|pentakill)")
+	return cmd
+}
+
+func runNew(cmd *cobra.Command, changeName string) error {
+	description, _ := cmd.Flags().GetString("description")
+	methodology, _ := cmd.Flags().GetString("methodology")
+
+	// Create orchestrator
+	cfg := DefaultSessionConfig()
+	orch, err := NewOrchestrator(cfg.Path)
+	if err != nil {
+		return fmt.Errorf("failed to create orchestrator: %w", err)
+	}
+
+	// Create session
+	session, err := orch.CreateSession(changeName, description, methodology)
+	if err != nil {
+		return fmt.Errorf("failed to create session: %w", err)
+	}
+
+	// Save current session ID to state
+	state, err := loadState()
+	if err != nil {
+		return fmt.Errorf("failed to load state: %w", err)
+	}
+	state.SetCurrentID(session.ID)
+	if err := state.Save(); err != nil {
+		return fmt.Errorf("failed to save state: %w", err)
+	}
+
+	jsonOutput, _ := cmd.Flags().GetBool("json")
+	if jsonOutput {
+		enc := json.NewEncoder(os.Stdout)
+		enc.SetIndent("", "  ")
+		return enc.Encode(session)
+	}
+
+	fmt.Printf("New session created: %s (%s mode)\n", session.ID[:8], session.Methodology)
+	return nil
 }
 
 func newNextCmd() *cobra.Command {
@@ -145,6 +200,7 @@ func runStatus(cmd *cobra.Command) error {
 	fmt.Println("╠══════════════════════════════════════════════════╣")
 	fmt.Printf("║  Change:    %-35s║\n", session.ChangeName)
 	fmt.Printf("║  Phase:     %-35s║\n", session.Phase)
+	fmt.Printf("║  Method:    %-35s║\n", session.Methodology)
 	fmt.Printf("║  Status:    %-35s║\n", session.Status)
 	fmt.Printf("║  Progress:  %-35s║\n", fmt.Sprintf("%.0f%%", state.Progress*100))
 	fmt.Printf("║  Started:   %-35s║\n", session.CreatedAt.Format(time.RFC822))
@@ -153,14 +209,15 @@ func runStatus(cmd *cobra.Command) error {
 	// Show phase progress
 	fmt.Println()
 	fmt.Println("Phase Progress:")
-	for i, phase := range PhaseOrder {
+	order := GetPhaseOrder(session.Methodology)
+	for i, phase := range order {
 		prefix := "[ ]"
 		if phase == session.Phase {
 			prefix = "[*]"
-		} else if i < len(PhaseOrder) {
+		} else if i < len(order) {
 			// Check if phase is completed
 			sessionState := NewSessionState(session)
-			if sessionState.Progress >= float64(i)/float64(len(PhaseOrder)-1) {
+			if sessionState.Progress >= float64(i)/float64(len(order)-1) {
 				prefix = "[x]"
 			}
 		}
@@ -235,6 +292,7 @@ Use 'odin session list' to see available sessions.`,
 	}
 
 	cmd.Flags().Bool("create", false, "Create a new session if not found")
+	cmd.Flags().String("methodology", MethodologyStandard, "Methodology if creating new (standard|triad|pentakill)")
 	return cmd
 }
 
@@ -251,8 +309,9 @@ func runSessionResume(cmd *cobra.Command, id string) error {
 		if os.IsNotExist(err) {
 			create, _ := cmd.Flags().GetBool("create")
 			if create {
+				methodology, _ := cmd.Flags().GetString("methodology")
 				// Create new session with id as name
-				session, err = orch.CreateSession(id, "")
+				session, err = orch.CreateSession(id, "", methodology)
 				if err != nil {
 					return fmt.Errorf("failed to create session: %w", err)
 				}

@@ -26,6 +26,11 @@ const (
 	StageCommit  Stage = "commit"
 )
 
+// AllStages returns all pipeline stages in execution order
+func AllStages() []Stage {
+	return []Stage{StageDetect, StageBackup, StageInstall, StageVerify, StageCommit}
+}
+
 // StageResult represents the result of a stage execution
 type StageResult struct {
 	Stage     Stage
@@ -36,15 +41,29 @@ type StageResult struct {
 	Duration  time.Duration
 }
 
-// Pipeline represents the installation pipeline
-type Pipeline struct {
-	componentID string
-	ctx         context.Context
-	cancel      context.CancelFunc
-	stages      []Stage
-	results     []StageResult
-	backupPath  string
-	detected    *SystemDetection
+// NewStageResult creates a new stage result
+func NewStageResult(stage Stage, success bool, output string, err error, duration time.Duration) StageResult {
+	return StageResult{
+		Stage:     stage,
+		Success:   success,
+		Output:    output,
+		Error:     err,
+		Timestamp: time.Now(),
+		Duration:  duration,
+	}
+}
+
+// IsSuccess returns true if the stage completed successfully
+func (r StageResult) IsSuccess() bool {
+	return r.Success && r.Error == nil
+}
+
+// Summary returns a one-line summary of the result
+func (r StageResult) Summary() string {
+	if r.Success {
+		return fmt.Sprintf("[%s] ✓ %s (%.2fs)", r.Stage, r.Output, r.Duration.Seconds())
+	}
+	return fmt.Sprintf("[%s] ✗ %s: %v (%.2fs)", r.Stage, r.Output, r.Error, r.Duration.Seconds())
 }
 
 // SystemDetection contains detected system information
@@ -61,6 +80,97 @@ type SystemDetection struct {
 	Issues     []string
 }
 
+// NewSystemDetection creates a new system detection
+func NewSystemDetection() *SystemDetection {
+	return &SystemDetection{
+		OS:      runtime.GOOS,
+		Arch:    runtime.GOARCH,
+		HomeDir: os.Getenv("HOME"),
+	}
+}
+
+// GetUser populates user information in the detection
+func (d *SystemDetection) GetUser() error {
+	if usr, err := user.Current(); err == nil {
+		d.User = usr.Username
+	}
+	return nil
+}
+
+// GetAgents detects installed agents
+func (d *SystemDetection) GetAgents() {
+	catalogManager := catalog.DefaultCatalogManager()
+	detected := catalogManager.DetectInstalledAgents()
+	d.Agents = make([]catalog.AgentID, len(detected))
+	for i, agent := range detected {
+		d.Agents[i] = agent.ID
+	}
+}
+
+// GetComponents populates detected components from .odin directory
+func (d *SystemDetection) GetComponents() error {
+	if d.HomeDir == "" {
+		var err error
+		d.HomeDir, err = os.UserHomeDir()
+		if err != nil {
+			return err
+		}
+	}
+
+	odinPath := filepath.Join(d.HomeDir, ".odin")
+	if entries, err := os.ReadDir(odinPath); err == nil {
+		for _, entry := range entries {
+			if entry.IsDir() {
+				d.Components = append(d.Components, entry.Name())
+			}
+		}
+	}
+	return nil
+}
+
+// GetRunes populates detected runes from .odin/runes directory
+func (d *SystemDetection) GetRunes() error {
+	if d.HomeDir == "" {
+		var err error
+		d.HomeDir, err = os.UserHomeDir()
+		if err != nil {
+			return err
+		}
+	}
+
+	runesPath := filepath.Join(d.HomeDir, ".odin", "runes")
+	if entries, err := os.ReadDir(runesPath); err == nil {
+		for _, entry := range entries {
+			if entry.IsDir() {
+				d.Runes = append(d.Runes, entry.Name())
+			}
+		}
+	}
+	return nil
+}
+
+// SetCanInstall sets the CanInstall flag
+func (d *SystemDetection) SetCanInstall(can bool) {
+	d.CanInstall = can
+}
+
+// Summary returns a human-readable summary of the detection
+func (d *SystemDetection) Summary() string {
+	return fmt.Sprintf("OS: %s, Arch: %s, Agents: %d, Components: %d, Runes: %d",
+		d.OS, d.Arch, len(d.Agents), len(d.Components), len(d.Runes))
+}
+
+// Pipeline represents the installation pipeline
+type Pipeline struct {
+	componentID string
+	ctx         context.Context
+	cancel      context.CancelFunc
+	stages      []Stage
+	results     []StageResult
+	backupPath  string
+	detected    *SystemDetection
+}
+
 // NewPipeline creates a new pipeline for installing a component
 func NewPipeline(componentID string) *Pipeline {
 	ctx, cancel := context.WithCancel(context.Background())
@@ -68,7 +178,7 @@ func NewPipeline(componentID string) *Pipeline {
 		componentID: componentID,
 		ctx:         ctx,
 		cancel:      cancel,
-		stages:      []Stage{StageDetect, StageBackup, StageInstall, StageVerify, StageCommit},
+		stages:      AllStages(),
 		results:     []StageResult{},
 	}
 }
@@ -132,70 +242,33 @@ func (p *Pipeline) executeStage(stage Stage) StageResult {
 
 	duration := time.Since(start)
 
-	return StageResult{
-		Stage:     stage,
-		Success:   err == nil,
-		Output:    output,
-		Error:     err,
-		Timestamp: start,
-		Duration:  duration,
-	}
+	return NewStageResult(stage, err == nil, output, err, duration)
 }
 
 // runDetect performs system detection
 func (p *Pipeline) runDetect() (string, error) {
-	detection := &SystemDetection{
-		OS:        runtime.GOOS,
-		Arch:      runtime.GOARCH,
-		Container: detectContainer(),
-		HomeDir:   os.Getenv("HOME"),
+	detection := NewSystemDetection()
+
+	if err := detection.GetUser(); err != nil {
+		logger.Warn("Failed to get user info", "error", err)
 	}
 
-	if detection.HomeDir == "" {
-		detection.HomeDir, _ = os.UserHomeDir()
-	}
-
-	// Get user
-	if usr, err := user.Current(); err == nil {
-		detection.User = usr.Username
-	}
-
-	// Detect installed agents
-	catalogManager := catalog.DefaultCatalogManager()
-	detection.Agents = catalogManager.DetectInstalledAgents()
-
-	// Check existing components
-	odinPath := filepath.Join(detection.HomeDir, ".odin")
-	if entries, err := os.ReadDir(odinPath); err == nil {
-		for _, entry := range entries {
-			if entry.IsDir() {
-				detection.Components = append(detection.Components, entry.Name())
-			}
-		}
-	}
-
-	// Check installed runes
-	runesPath := filepath.Join(odinPath, "runes")
-	if entries, err := os.ReadDir(runesPath); err == nil {
-		for _, entry := range entries {
-			if entry.IsDir() {
-				detection.Runes = append(detection.Runes, entry.Name())
-			}
-		}
-	}
-
-	detection.CanInstall = true
+	detection.GetAgents()
+	detection.GetComponents()
+	detection.GetRunes()
+	detection.SetCanInstall(true)
 
 	p.detected = detection
 
-	output := fmt.Sprintf("OS: %s, Arch: %s, Agents: %d, Components: %d, Runes: %d",
-		detection.OS, detection.Arch, len(detection.Agents), len(detection.Components), len(detection.Runes))
-
-	return output, nil
+	return detection.Summary(), nil
 }
 
 // runBackup creates a backup before installation
 func (p *Pipeline) runBackup() (string, error) {
+	if p.detected == nil {
+		return "", fmt.Errorf("system detection not completed")
+	}
+
 	backupPath, err := backup.CreateBackup(filepath.Join(p.detected.HomeDir, ".odin"))
 	if err != nil {
 		return "", fmt.Errorf("backup failed: %w", err)
@@ -207,6 +280,10 @@ func (p *Pipeline) runBackup() (string, error) {
 
 // runInstall performs the actual installation
 func (p *Pipeline) runInstall() (string, error) {
+	if p.detected == nil {
+		return "", fmt.Errorf("system detection not completed")
+	}
+
 	comp := catalog.DefaultCatalogManager().GetComponent(p.componentID)
 	if comp == nil {
 		return "", fmt.Errorf("component %s not found", p.componentID)
@@ -220,19 +297,36 @@ func (p *Pipeline) runInstall() (string, error) {
 		return "", fmt.Errorf("failed to create component directory: %w", err)
 	}
 
+	// Create a marker file indicating installation
+	markerPath := filepath.Join(compPath, ".installed")
+	if err := os.WriteFile(markerPath, []byte(fmt.Sprintf("Installed at %s", time.Now().Format(time.RFC3339))), 0644); err != nil {
+		logger.Warn("Failed to create marker file", "error", err)
+	}
+
 	// Install runes if specified
+	runesInstalled := 0
 	for _, runeName := range comp.Runes {
 		runePath := filepath.Join(odinPath, "runes", runeName)
 		if err := os.MkdirAll(runePath, 0755); err != nil {
 			logger.Warn("Failed to create rune directory", "rune", runeName, "error", err)
+		} else {
+			// Copy RUNE.md and rune.yaml from source repo
+			if err := p.copyRuneFiles(runeName, runePath); err != nil {
+				logger.Warn("Failed to copy rune files", "rune", runeName, "error", err)
+			}
+			runesInstalled++
 		}
 	}
 
-	return fmt.Sprintf("Installed %s with %d runes", comp.Name, len(comp.Runes)), nil
+	return fmt.Sprintf("Installed %s with %d runes", comp.Name, runesInstalled), nil
 }
 
 // runVerify verifies the installation
 func (p *Pipeline) runVerify() (string, error) {
+	if p.detected == nil {
+		return "", fmt.Errorf("system detection not completed")
+	}
+
 	odinPath := filepath.Join(p.detected.HomeDir, ".odin")
 	compPath := filepath.Join(odinPath, p.componentID)
 
@@ -286,6 +380,10 @@ func (p *Pipeline) rollback(failedStage Stage, originalError error) error {
 
 // rollbackInstall reverses the install stage
 func (p *Pipeline) rollbackInstall() error {
+	if p.detected == nil {
+		return fmt.Errorf("system detection not completed")
+	}
+
 	odinPath := filepath.Join(p.detected.HomeDir, ".odin")
 	compPath := filepath.Join(odinPath, p.componentID)
 
@@ -363,4 +461,57 @@ func HasRune(name string) bool {
 // HasComponent checks if a component is available in the catalog
 func HasComponent(name string) bool {
 	return catalog.DefaultCatalogManager().GetComponent(name) != nil
+}
+
+// copyRuneFiles copies RUNE.md and rune.yaml from source to target
+func (p *Pipeline) copyRuneFiles(runeName string, targetPath string) error {
+	// Try to find source rune directory in the repo
+	// The source could be in the ODIN_REPO/runes/{runeName} directory
+	possibleSources := []string{
+		filepath.Join(".", "runes", runeName),
+		filepath.Join("..", "runes", runeName),
+		filepath.Join(os.Getenv("ODIN_ROOT"), "runes", runeName),
+	}
+
+	foundRune := false
+	for _, srcPath := range possibleSources {
+		runeMdPath := filepath.Join(srcPath, "RUNE.md")
+		runeYamlPath := filepath.Join(srcPath, "rune.yaml")
+
+		if _, err := os.Stat(runeMdPath); err == nil {
+			// RUNE.md exists in this source
+			if err := copyFile(runeMdPath, filepath.Join(targetPath, "RUNE.md")); err == nil {
+				foundRune = true
+				logger.Debug("Copied RUNE.md", "source", runeMdPath, "target", targetPath)
+			}
+		}
+
+		if _, err := os.Stat(runeYamlPath); err == nil {
+			// rune.yaml exists
+			if err := copyFile(runeYamlPath, filepath.Join(targetPath, "rune.yaml")); err == nil {
+				logger.Debug("Copied rune.yaml", "source", runeYamlPath, "target", targetPath)
+			}
+		}
+
+		if foundRune {
+			return nil
+		}
+	}
+
+	if !foundRune {
+		// Create minimal RUNE.md if source not found
+		defaultContent := "# " + runeName + "\n\n## Purpose\nRune installed via pipeline.\n"
+		os.WriteFile(filepath.Join(targetPath, "RUNE.md"), []byte(defaultContent), 0644)
+	}
+
+	return nil
+}
+
+// copyFile copies a single file from src to dst
+func copyFile(src, dst string) error {
+	data, err := os.ReadFile(src)
+	if err != nil {
+		return err
+	}
+	return os.WriteFile(dst, data, 0644)
 }

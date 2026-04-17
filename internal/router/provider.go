@@ -57,41 +57,5 @@ type Provider interface {
 	IsAvailable(ctx context.Context) bool
 }
 
-// ProviderConfig holds configuration for a provider
-type ProviderConfig struct {
-	Enabled  bool   `mapstructure:"enabled"`
-	Endpoint string `mapstructure:"endpoint"`
-	APIKey   string `mapstructure:"api_key"`
-}
-
-// OllamaConfig holds Ollama-specific configuration
-type OllamaConfig struct {
-	Enabled  bool   `mapstructure:"enabled"`
-	Endpoint string `mapstructure:"endpoint"`
-}
-
-// OpenRouterConfig holds OpenRouter-specific configuration
-type OpenRouterConfig struct {
-	Enabled  bool   `mapstructure:"enabled"`
-	APIKey   string `mapstructure:"api_key"`
-	Endpoint string `mapstructure:"endpoint"`
-}
-
-// AnthropicConfig holds Anthropic-specific configuration
-type AnthropicConfig struct {
-	Enabled  bool   `mapstructure:"enabled"`
-	APIKey   string `mapstructure:"api_key"`
-	Endpoint string `mapstructure:"endpoint"`
-}
-
-// DefaultOllamaEndpoint is the default Ollama endpoint
-const DefaultOllamaEndpoint = "http://localhost:11434"
-
-// DefaultOpenRouterEndpoint is the default OpenRouter endpoint
-const DefaultOpenRouterEndpoint = "https://openrouter.ai/api/v1"
-
-// DefaultAnthropicEndpoint is the default Anthropic endpoint
-const DefaultAnthropicEndpoint = "https://api.anthropic.com"
-
 // Timeout is the default timeout for provider requests
 const Timeout = 30 * time.Second

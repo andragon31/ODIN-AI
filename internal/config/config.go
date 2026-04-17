@@ -19,12 +19,34 @@ type Config struct {
 	Sync          SyncConfig     `mapstructure:"sync"`
 	Guardian      GuardianConfig `mapstructure:"guardian"`
 	Router        RouterConfig   `mapstructure:"router"`
+	Discovery     DiscoveryConfig `mapstructure:"discovery"`
 	Observability ObservConfig   `mapstructure:"observability"`
 	Plugins       PluginsConfig  `mapstructure:"plugins"`
 	Themes        ThemesConfig   `mapstructure:"themes"`
 	Session       SessionConfig  `mapstructure:"session"`
 	Runes         RunesConfig    `mapstructure:"runes"`
 	Verify        VerifyConfig   `mapstructure:"verify"`
+}
+
+// DiscoveryConfig holds the results of tool discovery
+type DiscoveryConfig struct {
+	LastScan    string                     `mapstructure:"last_scan"`
+	Tools       map[string]DiscoveryResult `mapstructure:"tools"`
+}
+
+// ToolModel represents a detected model from an external tool
+type ToolModel struct {
+	Name        string `json:"name" mapstructure:"name"`
+	Provider    string `json:"provider" mapstructure:"provider"`
+	DisplayName string `json:"displayName" mapstructure:"displayName"`
+}
+
+// DiscoveryResult represents the detected configuration for a specific tool
+type DiscoveryResult struct {
+	ToolName string            `json:"toolName" mapstructure:"toolName"`
+	Models   []ToolModel       `json:"models" mapstructure:"models"`
+	APIKeys  map[string]string `json:"apiKeys" mapstructure:"apiKeys"`
+	Path     string            `json:"path" mapstructure:"path"`
 }
 
 // MemoryConfig holds memory engine configuration
@@ -65,9 +87,79 @@ type SASTConfig struct {
 
 // RouterConfig holds model router configuration
 type RouterConfig struct {
-	Default    string   `mapstructure:"default"`
-	Fallback   []string `mapstructure:"fallback"`
-	CostCapDay float64  `mapstructure:"cost_cap_daily"`
+	Default    string                    `mapstructure:"default"`
+	Fallback   []string                  `mapstructure:"fallback"`
+	CostCapDay float64                   `mapstructure:"cost_cap_daily"`
+	Mapping    ModelMapping              `mapstructure:"mapping"`
+	Providers  map[string]ProviderConfig `mapstructure:"providers"`
+}
+
+// ProviderConfig holds configuration for a provider
+type ProviderConfig struct {
+	Enabled  bool   `mapstructure:"enabled"`
+	Endpoint string `mapstructure:"endpoint"`
+	APIKey   string `mapstructure:"api_key"`
+}
+
+// OllamaConfig holds Ollama-specific configuration
+type OllamaConfig struct {
+	Enabled  bool   `mapstructure:"enabled"`
+	Endpoint string `mapstructure:"endpoint"`
+}
+
+// OpenRouterConfig holds OpenRouter-specific configuration
+type OpenRouterConfig struct {
+	Enabled  bool   `mapstructure:"enabled"`
+	APIKey   string `mapstructure:"api_key"`
+	Endpoint string `mapstructure:"endpoint"`
+}
+
+// AnthropicConfig holds Anthropic-specific configuration
+type AnthropicConfig struct {
+	Enabled  bool   `mapstructure:"enabled"`
+	APIKey   string `mapstructure:"api_key"`
+	Endpoint string `mapstructure:"endpoint"`
+}
+
+// OpenAIConfig holds OpenAI-specific configuration
+type OpenAIConfig struct {
+	Enabled  bool   `mapstructure:"enabled"`
+	APIKey   string `mapstructure:"api_key"`
+	Endpoint string `mapstructure:"endpoint"`
+}
+
+// Default endpoints
+const (
+	DefaultOllamaEndpoint     = "http://localhost:11434"
+	DefaultOpenRouterEndpoint = "https://openrouter.ai/api/v1"
+	DefaultAnthropicEndpoint  = "https://api.anthropic.com"
+	DefaultOpenAIEndpoint     = "https://api.openai.com/v1"
+)
+
+// ModelMapping holds manual mappings for agents/models
+type ModelMapping struct {
+	PhaseMappings map[string]string `mapstructure:"phase_mappings"`
+	RuneMappings  map[string]string `mapstructure:"rune_mappings"`
+}
+
+// SDD Phases for mapping
+var SDDPhases = []string{
+	"explore",
+	"propose",
+	"spec",
+	"design",
+	"tasks",
+	"apply",
+	"verify",
+	"archive",
+}
+
+// Common Runes for mapping
+var CommonRunes = []string{
+	"branch-pr",
+	"issue-creation",
+	"judgment-day",
+	"skill-creator",
 }
 
 // ObservConfig holds observability configuration
@@ -146,6 +238,31 @@ func DefaultConfig() *Config {
 			Default:    "ollama-local",
 			Fallback:   []string{"openrouter", "anthropic"},
 			CostCapDay: 0.0,
+			Mapping: ModelMapping{
+				PhaseMappings: make(map[string]string),
+				RuneMappings:  make(map[string]string),
+			},
+			Providers: map[string]ProviderConfig{
+				"ollama": {
+					Enabled:  true,
+					Endpoint: DefaultOllamaEndpoint,
+				},
+				"openrouter": {
+					Enabled:  true,
+					Endpoint: DefaultOpenRouterEndpoint,
+				},
+				"anthropic": {
+					Enabled:  true,
+					Endpoint: DefaultAnthropicEndpoint,
+				},
+				"openai": {
+					Enabled:  false,
+					Endpoint: DefaultOpenAIEndpoint,
+				},
+			},
+		},
+		Discovery: DiscoveryConfig{
+			Tools: make(map[string]DiscoveryResult),
 		},
 		Observability: ObservConfig{
 			MetricsPort: 9090,
@@ -191,6 +308,7 @@ func Load(configPath string) (*Config, error) {
 	v.SetDefault("sync", defaults.Sync)
 	v.SetDefault("guardian", defaults.Guardian)
 	v.SetDefault("router", defaults.Router)
+	v.SetDefault("discovery", defaults.Discovery)
 	v.SetDefault("observability", defaults.Observability)
 	v.SetDefault("plugins", defaults.Plugins)
 	v.SetDefault("themes", defaults.Themes)
@@ -239,6 +357,39 @@ func (c *Config) EnsureDirs() error {
 		if err := os.MkdirAll(dir, 0755); err != nil {
 			return fmt.Errorf("failed to create directory %s: %w", dir, err)
 		}
+	}
+
+	return nil
+}
+
+// Save persists the current configuration to the specified path
+func (c *Config) Save(configPath string) error {
+	v := viper.New()
+
+	// Set all values into viper
+	v.Set("version", c.Version)
+	v.Set("mode", c.Mode)
+	v.Set("home_dir", c.HomeDir)
+	v.Set("memory", c.Memory)
+	v.Set("sync", c.Sync)
+	v.Set("guardian", c.Guardian)
+	v.Set("router", c.Router)
+	v.Set("discovery", c.Discovery)
+	v.Set("observability", c.Observability)
+	v.Set("plugins", c.Plugins)
+	v.Set("themes", c.Themes)
+	v.Set("session", c.Session)
+	v.Set("runes", c.Runes)
+	v.Set("verify", c.Verify)
+
+	// Ensure directory exists
+	dir := filepath.Dir(configPath)
+	if err := os.MkdirAll(dir, 0755); err != nil {
+		return fmt.Errorf("failed to create config directory: %w", err)
+	}
+
+	if err := v.WriteConfigAs(configPath); err != nil {
+		return fmt.Errorf("failed to write config: %w", err)
 	}
 
 	return nil

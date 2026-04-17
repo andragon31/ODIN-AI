@@ -125,9 +125,9 @@ func DetectSystem() (*SystemInfo, error) {
 }
 
 // DefaultInstallPath returns the default install path for the OS
-func DefaultInstallPath(os string) string {
+func DefaultInstallPath(osName string) string {
 	homeDir, _ := os.UserHomeDir()
-	switch os {
+	switch osName {
 	case "linux":
 		// Check if /usr/local/bin exists and is writable
 		if _, err := os.Stat("/usr/local/bin"); err == nil {

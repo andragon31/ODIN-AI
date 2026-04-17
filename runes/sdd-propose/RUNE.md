@@ -14,6 +14,7 @@ Use this rune when:
 ## What You Receive
 
 - Change name (e.g., "add-dark-mode")
+- Methodology (`standard | triad | pentakill`)
 - Exploration analysis (from sdd-explore) OR direct user description
 - Artifact store mode (`engram | openspec | hybrid | none`)
 
@@ -95,6 +96,7 @@ Be specific about the user need or technical debt being addressed.}
 
 - In `openspec` mode, ALWAYS create the `proposal.md` file
 - If the change directory already exists with a proposal, READ it first and UPDATE it
+- **Indagación Proactiva**: Si el alcance es ambiguo o el usuario no fue específico, DEBES iniciar una conversación dinámica ANTES de finalizar la propuesta.
 - Keep the proposal CONCISE - it's a thinking tool, not a novel
 - Every proposal MUST have a rollback plan
 - Every proposal MUST have success criteria

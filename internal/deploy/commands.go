@@ -31,6 +31,7 @@ func Commands() *cobra.Command {
 		newStatusCmd(),
 		newInfoCmd(),
 		newListBackupsCmd(),
+		newForgeCmd(),
 	)
 
 	return cmd
@@ -492,4 +493,21 @@ func boolToYesNo(b bool) string {
 		return "Yes"
 	}
 	return "No"
+}
+
+func newForgeCmd() *cobra.Command {
+	return &cobra.Command{
+		Use:   "forge",
+		Short: "Forge infrastructure for the current project",
+		Long:  `Analyze the project and generate Docker/IaC artifacts using the Blacksmith engine.`,
+		RunE: func(cmd *cobra.Command, args []string) error {
+			return runForge(cmd)
+		},
+	}
+}
+
+func runForge(cmd *cobra.Command) error {
+	cwd, _ := os.Getwd()
+	fm := NewForgeManager(cwd)
+	return fm.RunForge()
 }

@@ -3,6 +3,7 @@ package tui
 
 import (
 	"testing"
+	"github.com/charmbracelet/lipgloss"
 )
 
 func TestNewThemeEngine(t *testing.T) {
@@ -127,12 +128,12 @@ func TestNewStyles(t *testing.T) {
 		t.Error("NewStyles() should not return nil")
 	}
 
-	if styles.Background == nil {
-		t.Error("Background style should not be nil")
+	if styles.Background.GetForeground() == nil {
+		t.Error("Background style should have a horizontal foreground assigned")
 	}
 
-	if styles.Card == nil {
-		t.Error("Card style should not be nil")
+	if styles.Card.GetBackground() == nil {
+		t.Error("Card style should have a background assigned")
 	}
 }
 

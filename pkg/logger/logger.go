@@ -17,9 +17,10 @@ const (
 	InfoLevel
 	WarnLevel
 	ErrorLevel
+	ThinkLevel // Inner monologue
 )
 
-var levelNames = []string{"DEBUG", "INFO", "WARN", "ERROR"}
+var levelNames = []string{"DEBUG", "INFO", "WARN", "ERROR", "THINK"}
 
 func (l Level) String() string {
 	if l < DebugLevel || l > ErrorLevel {
@@ -75,6 +76,11 @@ func Error(msg string, keyvals ...interface{}) {
 	log(ErrorLevel, msg, keyvals...)
 }
 
+// Think logs an inner monologue message
+func Think(msg string, keyvals ...interface{}) {
+	log(ThinkLevel, msg, keyvals...)
+}
+
 func log(level Level, msg string, keyvals ...interface{}) {
 	mu.Lock()
 	defer mu.Unlock()
@@ -86,7 +92,12 @@ func log(level Level, msg string, keyvals ...interface{}) {
 	timestamp := time.Now().Format("2006-01-02 15:04:05")
 	levelStr := level.String()
 
-	fmt.Fprintf(defaultLogger.output, "%s [%s] %s", timestamp, levelStr, msg)
+	if level == ThinkLevel {
+		// Gray color ANSI: \033[90m, Reset: \033[0m
+		fmt.Fprintf(defaultLogger.output, "\033[90m%s 🧠 %s\033[0m", timestamp, msg)
+	} else {
+		fmt.Fprintf(defaultLogger.output, "%s [%s] %s", timestamp, levelStr, msg)
+	}
 
 	for i := 0; i < len(keyvals); i += 2 {
 		if i+1 < len(keyvals) {

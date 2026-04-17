@@ -1,0 +1,23 @@
+{
+  "rules": [
+    {
+      "path": "security.rego",
+      "package": "odin.security",
+      "description": "Core security policies for ODIN"
+    },
+    {
+      "path": "rune-validation.rego",
+      "package": "odin.runes",
+      "description": "Rune content validation policies"
+    }
+  ],
+  "security": {
+    "sensitive_paths": ["/secret", "/config"],
+    "max_token_age": 3600
+  },
+  "runes": {
+    "required_files": ["RUNE.md"],
+    "required_yaml_fields": ["name", "version", "trigger", "description"],
+    "max_trigger_length": 50
+  }
+}

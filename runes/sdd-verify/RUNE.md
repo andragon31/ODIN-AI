@@ -14,9 +14,19 @@ Use this rune when:
 ## What You Receive
 
 - Change name
+- Methodology (`standard | triad | pentakill`)
 - Artifact store mode (`engram | openspec | hybrid | none`)
 
 ## Workflow
+
+### Step 0: Methodology Check
+
+Check the methodology of the session:
+- If **Methodology: triad**: Read [sdd-triad-protocol.md](file:///c:/Users%20Premium%20Computers/OneDrive/Documentos/GitHub/ODIN/runes/_shared/sdd-triad-protocol.md) before starting.
+- If **Methodology: pentakill**: Read [sdd-pentakill-protocol.md](file:///c:/Users/Premium%20Computers/OneDrive/Documentos/GitHub/ODIN/runes/_shared/sdd-pentakill-protocol.md).
+    - All BDD scenarios MUST have a corresponding passing test.
+    - Contract compliance is MANDATORY.
+    - Domain language compliance is MANDATORY.
 
 ### Step 1: Load Skills
 
@@ -118,6 +128,13 @@ FOR EACH REQUIREMENT in specs/:
 
 A spec scenario is only COMPLIANT when there is a test that PASSED proving the behavior.
 
+**MODE PENTAKILL (Pentakill Audit Mode):**
+- Verify that every public function/service matches the defined contract in `openspec/contracts/`.
+- Verify that variable naming and logical concepts match the Ubiquitous Language in `openspec/domain/`.
+- Verify that BDD scenarios only use terms defined in the domain.
+- Verify that every `[TDD: RED]` task has a corresponding test file.
+- Verify that every `[TDD: GREEN]` task has a passing result.
+
 ## Verification Report Format
 
 ```markdown
@@ -150,6 +167,8 @@ A spec scenario is only COMPLIANT when there is a test that PASSED proving the b
 | {REQ-01} | {Scenario} | `{test file} > {test name}` | ✅ COMPLIANT |
 
 **Compliance summary**: {N}/{total} scenarios compliant
+**Contract status**: {Method matches contract / Deviates from v1}
+**Domain status**: {Concepts match domain / Conceptual leak detected}
 
 ---
 

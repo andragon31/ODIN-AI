@@ -52,21 +52,49 @@ jobs:
           echo "VERSION=$VERSION" >> $GITHUB_OUTPUT
           echo "TARGET=${{ matrix.target }}" >> $GITHUB_OUTPUT
 
-      - name: Build
+      - name: Build and Package
+        id: build
+        shell: bash
         run: |
+          VERSION="${{ steps.version.outputs.VERSION }}"
+          TARGET="${{ matrix.target }}"
           EXT=""
-          if [ "${{ matrix.target }}" = "windows-amd64" ]; then
+          BINARY_NAME="odin"
+          
+          if [[ "$TARGET" == windows-* ]]; then
             EXT=".exe"
           fi
-          OUTPUT="odin-${{{ matrix.target }}}-${{ steps.version.outputs.VERSION }}${EXT}"
-          go build -ldflags="-s -w" -o "$OUTPUT" ./cmd/odin
-          echo "OUTPUT=$OUTPUT" >> $GITHUB_OUTPUT
+          
+          # Build target
+          go build -ldflags="-s -w -X main.version=v$VERSION" -o "$BINARY_NAME$EXT" ./cmd/odin
+          
+          # Archive name (e.g., odin_0.1.0_windows_amd64.zip)
+          ARCHIVE_NAME="${BINARY_NAME}_${VERSION}_${TARGET//-/_}"
+          
+          if [[ "$TARGET" == windows-* ]]; then
+             ARCHIVE_FILENAME="${ARCHIVE_NAME}.zip"
+             zip "$ARCHIVE_FILENAME" "$BINARY_NAME$EXT"
+          else
+             ARCHIVE_FILENAME="${ARCHIVE_NAME}.tar.gz"
+             tar -czf "$ARCHIVE_FILENAME" "$BINARY_NAME"
+          fi
+          
+          # Generate individual checksum
+          if [[ "$TARGET" == windows-* ]]; then
+            sha256sum "$ARCHIVE_FILENAME" > checksums.txt
+          else
+            sha256sum "$ARCHIVE_FILENAME" > checksums.txt
+          fi
+          
+          echo "ARCHIVE=$ARCHIVE_FILENAME" >> $GITHUB_OUTPUT
 
       - name: Upload Release Asset
         uses: softprops/action-gh-release@v2
         with:
           tag_name: v${{ steps.version.outputs.VERSION }}
-          files: ${{ steps.build.outputs.OUTPUT }}
+          files: |
+            ${{ steps.build.outputs.ARCHIVE }}
+            checksums.txt
           generate_release_notes: true
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

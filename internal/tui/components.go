@@ -326,9 +326,9 @@ func (t *Table) Render() string {
 	// Render rows
 	for _, row := range t.Rows {
 		for i, cell := range row {
-			width := t.Widths[i]
-			if i >= len(width) {
-				width = 10
+			width := 10
+			if i < len(t.Widths) {
+				width = t.Widths[i]
 			}
 			styledCell := t.Styles.RenderTableCell(cell, width, lipgloss.Left)
 			builder.WriteString(t.Styles.Text.Render(styledCell))

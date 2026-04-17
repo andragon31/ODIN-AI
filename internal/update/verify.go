@@ -97,21 +97,148 @@ func GetDownloadPath(cfg *Config, version string) string {
 
 // ExtractArchive extracts a downloaded archive to a binary
 func ExtractArchive(archivePath string, destDir string) (string, error) {
-	// For now, just rename the file if it's already a binary
-	// In a full implementation, this would handle .tar.gz and .zip extraction
-	_, err := os.Stat(archivePath)
-	if err != nil {
-		return "", err
+	if _, err := os.Stat(archivePath); err != nil {
+		return "", fmt.Errorf("archive not found: %w", err)
 	}
 
-	// Simple case: assume the archive IS the binary (for development)
-	// Real implementation would detect archive type and extract properly
-	filename := filepath.Base(archivePath)
-	destPath := filepath.Join(destDir, strings.TrimSuffix(filename, archiveExt()))
+	// Create destination directory if needed
+	if err := os.MkdirAll(destDir, 0755); err != nil {
+		return "", fmt.Errorf("failed to create destination: %w", err)
+	}
 
-	if err := os.Rename(archivePath, destPath); err != nil {
-		return "", err
+	ext := filepath.Ext(archivePath)
+
+	// Handle .tar.gz
+	if ext == ".gz" && strings.HasSuffix(archivePath, ".tar.gz") {
+		return extractTarGz(archivePath, destDir)
+	}
+
+	// Handle .zip
+	if ext == ".zip" {
+		return extractZip(archivePath, destDir)
+	}
+
+	// Handle .gz (single file)
+	if ext == ".gz" && !strings.HasSuffix(archivePath, ".tar.gz") {
+		return extractGzip(archivePath, destDir)
+	}
+
+	// Handle .tar
+	if ext == ".tar" {
+		return extractTar(archivePath, destDir)
+	}
+
+	// Unknown format - assume it's already a binary
+	filename := filepath.Base(archivePath)
+	destPath := filepath.Join(destDir, strings.TrimSuffix(filename, ext))
+
+	if err := copyFile(archivePath, destPath); err != nil {
+		return "", fmt.Errorf("failed to copy binary: %w", err)
 	}
 
 	return destPath, nil
+}
+
+// extractTarGz extracts a .tar.gz archive
+func extractTarGz(archivePath string, destDir string) (string, error) {
+	// Check for tar command first
+	if _, err := exec.LookPath("tar"); err == nil {
+		args := []string{"-xzf", archivePath, "-C", destDir}
+		cmd := exec.Command("tar", args...)
+		if err := cmd.Run(); err == nil {
+			// Return the first file extracted
+			entries, _ := os.ReadDir(destDir)
+			for _, entry := range entries {
+				if !entry.IsDir() {
+					return filepath.Join(destDir, entry.Name()), nil
+				}
+			}
+		}
+	}
+
+	// Fallback: manual extraction using Go (requires external library)
+	return "", fmt.Errorf("tar extraction requires 'tar' command")
+}
+
+// extractZip extracts a .zip archive
+func extractZip(archivePath string, destDir string) (string, error) {
+	if _, err := exec.LookPath("unzip"); err == nil {
+		cmd := exec.Command("unzip", "-o", archivePath, "-d", destDir)
+		if err := cmd.Run(); err != nil {
+			return "", fmt.Errorf("unzip failed: %w", err)
+		}
+		// Return first file found
+		filepath.Walk(destDir, func(path string, info os.FileInfo, err error) error {
+			if !info.IsDir() && err == nil {
+				return nil
+			}
+			return nil
+		})
+		entries, _ := os.ReadDir(destDir)
+		for _, entry := range entries {
+			if !entry.IsDir() {
+				return filepath.Join(destDir, entry.Name()), nil
+			}
+		}
+	}
+
+	return "", fmt.Errorf("zip extraction requires 'unzip' command")
+}
+
+// extractGzip extracts a .gz file
+func extractGzip(archivePath string, destDir string) (string, error) {
+	if _, err := exec.LookPath("gunzip"); err == nil {
+		baseName := strings.TrimSuffix(filepath.Base(archivePath), ".gz")
+		destPath := filepath.Join(destDir, baseName)
+
+		cmd := exec.Command("gunzip", "-c", archivePath)
+		output, err := cmd.Output()
+		if err != nil {
+			return "", fmt.Errorf("gunzip failed: %w", err)
+		}
+
+		if err := os.WriteFile(destPath, output, 0755); err != nil {
+			return "", fmt.Errorf("failed to write extracted file: %w", err)
+		}
+
+		return destPath, nil
+	}
+
+	return "", fmt.Errorf("gunzip not available")
+}
+
+// extractTar extracts a .tar archive
+func extractTar(archivePath string, destDir string) (string, error) {
+	if _, err := exec.LookPath("tar"); err == nil {
+		args := []string{"-xf", archivePath, "-C", destDir}
+		cmd := exec.Command("tar", args...)
+		if err := cmd.Run(); err != nil {
+			return "", fmt.Errorf("tar extraction failed: %w", err)
+		}
+		entries, _ := os.ReadDir(destDir)
+		for _, entry := range entries {
+			if !entry.IsDir() {
+				return filepath.Join(destDir, entry.Name()), nil
+			}
+		}
+	}
+
+	return "", fmt.Errorf("tar not available")
+}
+
+// copyFile copies a file from src to dst
+func copyFile(src, dst string) error {
+	data, err := os.ReadFile(src)
+	if err != nil {
+		return err
+	}
+
+	// Check if it's a valid archive by magic bytes
+	if len(data) > 2 {
+		if data[0] == 0x1f && data[1] == 0x8b { // gzip magic
+			return fmt.Errorf("file is compressed, not a binary")
+		}
+	}
+
+	return os.WriteFile(dst, data, 0755)
 }

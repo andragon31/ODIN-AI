@@ -9,6 +9,7 @@ import (
 
 	"github.com/spf13/cobra"
 
+	"github.com/odin-ai/odin/internal/config"
 	"github.com/odin-ai/odin/internal/router"
 	"github.com/odin-ai/odin/internal/skills"
 )
@@ -178,9 +179,9 @@ func runValidateForge(cmd *cobra.Command, args []string) error {
 // initRouter initializes the router for rune generation
 func initRouter() (*router.Router, error) {
 	// Try to create a basic router with Ollama
-	ollamaProvider := router.NewOllamaProvider(router.OllamaConfig{
+	ollamaProvider := router.NewOllamaProvider(config.OllamaConfig{
 		Enabled:  true,
-		Endpoint: "http://localhost:11434",
+		Endpoint: config.DefaultOllamaEndpoint,
 	})
 
 	r, err := router.NewRouter([]router.Provider{ollamaProvider}, "ollama")

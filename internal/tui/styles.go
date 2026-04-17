@@ -2,6 +2,7 @@
 package tui
 
 import (
+	"fmt"
 	"github.com/charmbracelet/lipgloss"
 )
 
@@ -58,7 +59,7 @@ func (s *Styles) RenderList(items []string, numbered bool) string {
 	for i, item := range items {
 		prefix := "  • "
 		if numbered {
-			prefix = lipgloss.NewStyle().Faint(true).Render("%d. ", i+1)
+			prefix = lipgloss.NewStyle().Faint(true).Render(fmt.Sprintf("%d. ", i+1))
 		}
 		result += s.Text.Render(prefix + item + "\n")
 	}
@@ -70,13 +71,13 @@ func (s *Styles) RenderStatusIndicator(status string) string {
 	var color lipgloss.Color
 	switch status {
 	case "success", "pass", "healthy":
-		color = s.Success.GetForeground()
+		color = s.Success.GetForeground().(lipgloss.Color)
 	case "error", "fail", "broken":
-		color = s.Error.GetForeground()
+		color = s.Error.GetForeground().(lipgloss.Color)
 	case "warning", "warn":
 		color = lipgloss.Color("#f9e2af") // Warning yellow
 	default:
-		color = s.Muted.GetForeground()
+		color = s.Muted.GetForeground().(lipgloss.Color)
 	}
 
 	dot := lipgloss.NewStyle().
@@ -100,16 +101,16 @@ func (s *Styles) RenderProgressBar(current, total int, width int) string {
 	empty := width - filled
 
 	filledStr := lipgloss.NewStyle().
-		Background(s.Accent.GetForeground()).
+		Background(s.Accent.GetForeground().(lipgloss.Color)).
 		Render(RepeatChar('█', filled))
 
 	emptyStr := lipgloss.NewStyle().
-		Foreground(s.Muted.GetForeground()).
+		Foreground(s.Muted.GetForeground().(lipgloss.Color)).
 		Render(RepeatChar('░', empty))
 
 	percentage := lipgloss.NewStyle().
 		Faint(true).
-		Render(" %d%%", int(ratio*100))
+		Render(fmt.Sprintf(" %d%%", int(ratio*100)))
 
 	return filledStr + emptyStr + percentage
 }
@@ -132,15 +133,15 @@ func (s *Styles) RenderHeader(title string) string {
 	border := RepeatChar('═', width)
 
 	top := lipgloss.NewStyle().
-		Foreground(s.Accent.GetForeground()).
+		Foreground(s.Accent.GetForeground().(lipgloss.Color)).
 		Render("╔" + border + "╗")
 
 	bottom := lipgloss.NewStyle().
-		Foreground(s.Accent.GetForeground()).
+		Foreground(s.Accent.GetForeground().(lipgloss.Color)).
 		Render("╚" + border + "╝")
 
 	middle := lipgloss.NewStyle().
-		Foreground(s.Accent.GetForeground()).
+		Foreground(s.Accent.GetForeground().(lipgloss.Color)).
 		Render("║")
 
 	centeredTitle := lipgloss.NewStyle().
@@ -152,11 +153,11 @@ func (s *Styles) RenderHeader(title string) string {
 }
 
 // RenderTableCell renders a table cell with alignment
-func (s *Styles) RenderTableCell(content string, width int, align lipgloss.Alignment) string {
+func (s *Styles) RenderTableCell(content string, width int, align lipgloss.Position) string {
 	style := lipgloss.NewStyle().
 		Width(width).
 		Align(align).
-		Foreground(s.Text.GetForeground())
+		Foreground(s.Text.GetForeground().(lipgloss.Color))
 
 	return style.Render(content)
 }

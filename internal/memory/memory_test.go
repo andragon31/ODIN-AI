@@ -2,8 +2,10 @@
 package memory
 
 import (
+	"fmt"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 	"time"
 )
@@ -666,7 +668,7 @@ func TestGraphEngine(t *testing.T) {
 	store.AddEdge(m2.ID, m3.ID, "connects", 1.0)
 
 	// Test GraphEngine directly
-	graph := NewGraphEngine(store.db)
+	graph := NewGraphEngine(store.projectDB)
 
 	// Get connected memories
 	connected, err := graph.GetConnectedMemories(m1.ID, "")
@@ -705,7 +707,7 @@ func TestPruner(t *testing.T) {
 	defer store.Close()
 
 	// Create pruner
-	pruner := NewPruner(store.db, []string{"protected"}, 1*time.Hour)
+	pruner := NewPruner(store.projectDB, []string{"protected"}, 1*time.Hour)
 	defer pruner.Stop()
 
 	// Start pruner
@@ -742,7 +744,7 @@ func TestSmartPruner(t *testing.T) {
 	}
 	defer store.Close()
 
-	smartPruner := NewSmartPruner(store.db, []string{"protected"}, 24*time.Hour)
+	smartPruner := NewSmartPruner(store.projectDB, []string{"protected"}, 24*time.Hour)
 
 	// Test should prune
 	m := &Memory{
@@ -841,5 +843,134 @@ func TestCosineSimilarity(t *testing.T) {
 	sim3 := cosineSim(a, d)
 	if sim3 != -1.0 {
 		t.Errorf("Opposite vectors should have similarity -1.0, got %f", sim3)
+	}
+}
+
+// TestMimirSearch_SemanticRelevance tests semantic search quality
+func TestMimirSearch_SemanticRelevance(t *testing.T) {
+	tmpDir := t.TempDir()
+	dbPath := filepath.Join(tmpDir, "test_semantic.db")
+
+	cfg := &Config{
+		DBPath:     dbPath,
+		VSSEnabled: false, // Use FTS5 fallback
+	}
+
+	store, err := NewStore(cfg)
+	if err != nil {
+		t.Fatalf("Failed to create store: %v", err)
+	}
+	defer store.Close()
+
+	// Store semantically different memories
+	memories := []*Memory{
+		{Content: "Python programming language tutorial", Tags: []string{"python", "programming"}},
+		{Content: "JavaScript web development guide", Tags: []string{"javascript", "web"}},
+		{Content: "Go programming language concurrency patterns", Tags: []string{"golang", "programming"}},
+		{Content: "Machine learning neural networks", Tags: []string{"ml", "ai"}},
+		{Content: "Database SQL queries optimization", Tags: []string{"database", "sql"}},
+	}
+
+	for _, m := range memories {
+		if err := store.Store(m); err != nil {
+			t.Fatalf("Failed to store memory: %v", err)
+		}
+	}
+
+	// Test: Search for "Python" should return Python memory first
+	results, err := store.Search("Python tutorial", 5)
+	if err != nil {
+		t.Fatalf("Failed to search: %v", err)
+	}
+
+	if len(results) == 0 {
+		t.Fatal("Expected search results")
+	}
+
+	// The first result should be about Python
+	firstResult := results[0]
+	if firstResult.Memory == nil {
+		t.Fatal("First result memory is nil")
+	}
+
+	// Check that Python content ranks higher than JavaScript for Python query
+	pythonRank := -1
+	javascriptRank := -1
+
+	for i, r := range results {
+		if r.Memory != nil {
+			if strings.Contains(r.Memory.Content, "Python") {
+				pythonRank = i
+			}
+			if strings.Contains(r.Memory.Content, "JavaScript") {
+				javascriptRank = i
+			}
+		}
+	}
+
+	if pythonRank == -1 {
+		t.Error("Python content should be in results")
+	}
+
+	if pythonRank > javascriptRank && javascriptRank != -1 {
+		t.Errorf("Python should rank higher than JavaScript for 'Python' query: python=%d, javascript=%d", pythonRank, javascriptRank)
+	}
+
+	// Test: Search for "programming" should return programming-related memories
+	progResults, _ := store.Search("programming", 5)
+	progCount := 0
+	for _, r := range progResults {
+		if r.Memory != nil && strings.Contains(r.Memory.Content, "programming") {
+			progCount++
+		}
+	}
+
+	if progCount < 2 {
+		t.Errorf("Expected at least 2 programming-related results, got %d", progCount)
+	}
+
+	// Test: Search for "web" should return JavaScript content
+	webResults, _ := store.Search("web development", 5)
+	webFound := false
+	for _, r := range webResults {
+		if r.Memory != nil && strings.Contains(r.Memory.Content, "JavaScript") {
+			webFound = true
+			break
+		}
+	}
+
+	if !webFound {
+		t.Error("JavaScript content should be found for 'web development' query")
+	}
+}
+
+// BenchmarkSemanticSearch benchmarks vector search performance
+func BenchmarkSemanticSearch(b *testing.B) {
+	tmpDir := b.TempDir()
+	dbPath := filepath.Join(tmpDir, "bench_semantic.db")
+
+	cfg := &Config{
+		DBPath:     dbPath,
+		VSSEnabled: false,
+	}
+
+	store, err := NewStore(cfg)
+	if err != nil {
+		b.Fatalf("Failed to create store: %v", err)
+	}
+	defer store.Close()
+
+	// Create test memories
+	for i := 0; i < 100; i++ {
+		m := &Memory{
+			Content: fmt.Sprintf("Test memory content number %d about various topics", i),
+			Tags:    []string{"benchmark"},
+		}
+		store.Store(m)
+	}
+
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		store.Search("test content", 10)
 	}
 }

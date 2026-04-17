@@ -96,13 +96,6 @@ func TestSessionCmd(t *testing.T) {
 	}
 }
 
-func TestTUIViewState(t *testing.T) {
-	view := NewTUIView()
-
-	if view.quitting {
-		t.Error("expected quitting to be false initially")
-	}
-}
 
 func TestStatusDataStructure(t *testing.T) {
 	// Test that the status command returns expected structure

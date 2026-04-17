@@ -11,7 +11,14 @@ import (
 	"github.com/spf13/cobra"
 
 	"github.com/odin-ai/odin/internal/config"
+	"github.com/odin-ai/odin/internal/tui"
 	"github.com/odin-ai/odin/pkg/logger"
+	tea "github.com/charmbracelet/bubbletea"
+)
+
+const (
+	colorGray  = "\033[90m"
+	colorReset = "\033[0m"
 )
 
 // Commands returns all Router CLI commands
@@ -30,7 +37,8 @@ in order until one succeeds.`,
 		newRouterFallbackCmd(),
 		newRouterMetricsCmd(),
 		newRouterModelsCmd(),
-		newRouterDetectCursorCmd(),
+		newRouterDiscoveryCmd(),
+		newSelectionCmd(),
 	)
 
 	return cmd
@@ -88,7 +96,7 @@ func runRouterStatus(cmd *cobra.Command) error {
 		if p.Name() == defaultProvider.Name() {
 			defaultMark = " (default)"
 		}
-		fmt.Printf("║    %-12s %-29s%s║\n", p.Name()+":", status, defaultMark)
+		fmt.Printf("║    🧠 %s%-12s%s %-26s%s║\n", colorGray, p.Name()+":", colorReset, status, defaultMark)
 	}
 
 	fmt.Println("╚══════════════════════════════════════════════════╝")
@@ -331,47 +339,153 @@ func runRouterModels(cmd *cobra.Command) error {
 	return nil
 }
 
-func newRouterDetectCursorCmd() *cobra.Command {
-	return &cobra.Command{
-		Use:   "detect-cursor",
-		Short: "Auto-detect models configured in Cursor IDE",
-		Long:  `Scan Cursor IDE settings to find configured AI models.`,
-		RunE: func(cmd *cobra.Command, args []string) error {
-			return runRouterDetectCursor(cmd)
-		},
+func newRouterDiscoveryCmd() *cobra.Command {
+	cmd := &cobra.Command{
+		Use:   "discovery",
+		Short: "AI Discovery - Find models in external tools",
+		Long:  `Scan external IDEs and tools (Cursor, VS Code, Windsurf, OpenCode) to detect configured AI models and API keys.`,
 	}
+
+	cmd.AddCommand(&cobra.Command{
+		Use:   "list",
+		Short: "List discovered tools and models",
+		RunE: func(cmd *cobra.Command, args []string) error {
+			return runDiscoveryList(cmd)
+		},
+	})
+
+	cmd.AddCommand(&cobra.Command{
+		Use:   "sync",
+		Short: "Sync detected API Keys to ODIN config",
+		RunE: func(cmd *cobra.Command, args []string) error {
+			return runDiscoverySync()
+		},
+	})
+
+	return cmd
 }
 
-func runRouterDetectCursor(cmd *cobra.Command) error {
+func runDiscoveryList(cmd *cobra.Command) error {
 	jsonOutput, _ := cmd.Flags().GetBool("json")
+	service := NewDiscoveryService()
 
-	models, err := DetectCursorModels()
-	if err != nil {
-		return fmt.Errorf("failed to detect Cursor models: %w", err)
-	}
+	fmt.Printf("🔍 Scanning for AI tools...\n\n")
+	results, errors := service.DiscoverAll()
 
 	if jsonOutput {
+		data := map[string]interface{}{
+			"results": results,
+			"errors":  errors,
+		}
 		enc := json.NewEncoder(os.Stdout)
 		enc.SetIndent("", "  ")
-		return enc.Encode(models)
+		return enc.Encode(data)
 	}
 
-	if len(models) == 0 {
-		fmt.Println("No Cursor models detected.")
-		fmt.Println("Make sure Cursor IDE is installed and has models configured.")
+	if len(results) == 0 {
+		fmt.Println("No models detected in external tools.")
 		return nil
 	}
 
-	fmt.Println("╔════════════════════════════════════════════════════════╗")
-	fmt.Println("║         Detected Cursor Models                         ║")
-	fmt.Println("╠════════════════════════════════════════════════════════╣")
+	for _, res := range results {
+		fmt.Printf("  🧠 %s%s%s\n", colorGray, res.ToolName, colorReset)
+		fmt.Printf("     %sPath: %s%s\n", colorGray, res.Path, colorReset)
 
-	for _, m := range models {
-		fmt.Printf("║  %-20s │ %-15s │ %-15s║\n", m.Name, m.Provider, m.DisplayName)
+		if len(res.Models) > 0 {
+			fmt.Printf("     Models:\n")
+			for _, m := range res.Models {
+				fmt.Printf("       - %s (%s)\n", m.Name, m.Provider)
+			}
+		}
+
+		if len(res.APIKeys) > 0 {
+			fmt.Printf("     API Keys: ")
+			keysFound := []string{}
+			for p := range res.APIKeys {
+				keysFound = append(keysFound, p)
+			}
+			fmt.Printf("%v\n", keysFound)
+		}
+		fmt.Println()
 	}
 
-	fmt.Println("╚════════════════════════════════════════════════════════╝")
+	if len(errors) > 0 {
+		fmt.Printf("\n%sWarnings during scan:%s\n", colorGray, colorReset)
+		for _, err := range errors {
+			fmt.Printf("  - %v\n", err)
+		}
+	}
+
 	return nil
+}
+
+func runDiscoverySync() error {
+	service := NewDiscoveryService()
+	results, _ := service.DiscoverAll()
+
+	if len(results) == 0 {
+		fmt.Println("No tools detected to sync.")
+		return nil
+	}
+
+	cfg, err := config.Load("")
+	if err != nil {
+		cfg = config.DefaultConfig()
+	}
+
+	syncedAny := false
+	for _, res := range results {
+		fmt.Printf("Syncing from %s...\n", res.ToolName)
+		
+		// Update discovery info in config
+		if cfg.Discovery.Tools == nil {
+			cfg.Discovery.Tools = make(map[string]config.DiscoveryResult)
+		}
+		cfg.Discovery.Tools[res.ToolName] = *res
+		cfg.Discovery.LastScan = time.Now().Format(time.RFC3339)
+
+		// Sync API Keys to providers
+		for provider, key := range res.APIKeys {
+			pCfg, ok := cfg.Router.Providers[provider]
+			if !ok {
+				pCfg = config.ProviderConfig{
+					Endpoint: inferEndpoint(provider),
+				}
+			}
+
+			if pCfg.APIKey == "" || pCfg.APIKey != key {
+				pCfg.APIKey = key
+				pCfg.Enabled = true
+				cfg.Router.Providers[provider] = pCfg
+				fmt.Printf("  ✅ API Key for %s updated\n", provider)
+				syncedAny = true
+			}
+		}
+	}
+
+	if syncedAny {
+		if err := cfg.Save(""); err != nil {
+			return fmt.Errorf("failed to save config: %w", err)
+		}
+		fmt.Println("\nConfiguration updated successfully.")
+	} else {
+		fmt.Println("\nConfiguration is already up to date.")
+	}
+
+	return nil
+}
+
+func inferEndpoint(provider string) string {
+	switch provider {
+	case "openai":
+		return config.DefaultOpenAIEndpoint
+	case "anthropic":
+		return config.DefaultAnthropicEndpoint
+	case "google":
+		return "https://generativelanguage.googleapis.com"
+	default:
+		return ""
+	}
 }
 
 // createRouter creates a router with all configured providers
@@ -382,21 +496,46 @@ func createRouter() (*Router, error) {
 		cfg = config.DefaultConfig()
 	}
 
-	providers := []Provider{
-		NewOllamaProvider(OllamaConfig{
+	providers := []Provider{}
+
+	// Load Ollama provider
+	if pCfg, ok := cfg.Router.Providers["ollama"]; ok {
+		providers = append(providers, NewOllamaProvider(config.OllamaConfig{
+			Enabled:  pCfg.Enabled,
+			Endpoint: pCfg.Endpoint,
+		}))
+	} else {
+		providers = append(providers, NewOllamaProvider(config.OllamaConfig{
 			Enabled:  true,
-			Endpoint: "http://localhost:11434",
-		}),
-		NewOpenRouterProvider(OpenRouterConfig{
-			Enabled:  true,
-			APIKey:   "",
-			Endpoint: "https://openrouter.ai/api/v1",
-		}),
-		NewAnthropicProvider(AnthropicConfig{
-			Enabled:  true,
-			APIKey:   "",
-			Endpoint: "https://api.anthropic.com",
-		}),
+			Endpoint: config.DefaultOllamaEndpoint,
+		}))
+	}
+
+	// Load OpenRouter provider
+	if pCfg, ok := cfg.Router.Providers["openrouter"]; ok {
+		providers = append(providers, NewOpenRouterProvider(config.OpenRouterConfig{
+			Enabled:  pCfg.Enabled,
+			APIKey:   pCfg.APIKey,
+			Endpoint: pCfg.Endpoint,
+		}))
+	}
+
+	// Load Anthropic provider
+	if pCfg, ok := cfg.Router.Providers["anthropic"]; ok {
+		providers = append(providers, NewAnthropicProvider(config.AnthropicConfig{
+			Enabled:  pCfg.Enabled,
+			APIKey:   pCfg.APIKey,
+			Endpoint: pCfg.Endpoint,
+		}))
+	}
+
+	// Load OpenAI provider
+	if pCfg, ok := cfg.Router.Providers["openai"]; ok {
+		providers = append(providers, NewOpenAIProvider(config.OpenAIConfig{
+			Enabled:  pCfg.Enabled,
+			APIKey:   pCfg.APIKey,
+			Endpoint: pCfg.Endpoint,
+		}))
 	}
 
 	r, err := NewRouter(providers, cfg.Router.Default)
@@ -409,4 +548,28 @@ func createRouter() (*Router, error) {
 	}
 
 	return r, nil
+}
+
+// newSelectionCmd creates the 'odin router selection' command
+func newSelectionCmd() *cobra.Command {
+	return &cobra.Command{
+		Use:   "selection",
+		Short: "Open manual model selection TUI",
+		RunE: func(cmd *cobra.Command, args []string) error {
+			cfg, err := config.Load("")
+			if err != nil {
+				return err
+			}
+
+			// Launch specific TUI view
+			app := tui.NewApp(cfg)
+			app.ActiveView = tui.ModelSelectionView
+
+			p := tea.NewProgram(app, tea.WithAltScreen())
+			if _, err := p.Run(); err != nil {
+				return fmt.Errorf("failed to run TUI: %w", err)
+			}
+			return nil
+		},
+	}
 }

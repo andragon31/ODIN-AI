@@ -1,8 +1,8 @@
-#Requires -Version 5.1
+# Requires -Version 5.1
 <#
 .SYNOPSIS
-    ODIN AI - Instalador para Windows
-    Ecosistema nórdico local-first desarrollado por Gentleman Programming.
+    ODIN AI — Install Script for Windows
+    Ecosistema nórdico local-first para el desarrollo spec-driven.
 
 .DESCRIPTION
     Descarga e instala el binario de ODIN para Windows.
@@ -19,8 +19,10 @@
     # Forzar método específico:
     .\install.ps1 -Method binary
     .\install.ps1 -Method go
-#>
 
+.GITHUB
+    Repositorio: https://github.com/andragon31/ODIN-AI
+#>
 [CmdletBinding()]
 param(
     [ValidateSet("auto", "go", "binary")]
@@ -29,26 +31,30 @@ param(
     [string]$InstallDir = ""
 )
 
-$ErrorActionPreference = "Continue"
+# Configuración crítica: Detenerse ante cualquier error para evitar estados corruptos
+$ErrorActionPreference = "Stop"
 
 $GITHUB_OWNER = "andragon31"
 $GITHUB_REPO = "ODIN-AI"
 $BINARY_NAME = "odin"
 
 # ============================================================================
-# Logging helpers
+# Helpers de Logging
 # ============================================================================
 
 function Write-Info    { param([string]$Message) Write-Host "[info]    $Message" -ForegroundColor Blue }
 function Write-Success { param([string]$Message) Write-Host "[ok]      $Message" -ForegroundColor Green }
 function Write-Warn    { param([string]$Message) Write-Host "[warn]    $Message" -ForegroundColor Yellow }
-function Write-Err    { param([string]$Message) Write-Host "[error]   $Message" -ForegroundColor Red }
-function Write-Step   { param([string]$Message) Write-Host "`n==> $Message" -ForegroundColor Cyan }
+function Write-Err     { param([string]$Message) Write-Host "[error]   $Message" -ForegroundColor Red }
+function Write-Step    { param([string]$Message) Write-Host "`n==> $Message" -ForegroundColor Cyan }
 
 function Stop-WithError {
     param([string]$Message)
     Write-Err $Message
-    throw $Message
+    Write-Host ""
+    Write-Host "Presiona cualquier tecla para cerrar esta ventana..." -ForegroundColor Gray
+    $null = [Console]::ReadKey($true)
+    exit 1
 }
 
 # ============================================================================
@@ -62,14 +68,13 @@ function Show-Banner {
     Write-Host " | |  | | | | || ||  \| |" -ForegroundColor Cyan
     Write-Host " | |__| | |_| || || |\  |" -ForegroundColor Cyan
     Write-Host "  \____/|____/|___|_| \_|" -ForegroundColor Cyan
-    Write-Host "   A I   E C O S Y S T E M   " -ForegroundColor DarkGray
     Write-Host ""
     Write-Host "  El orquestador nórdico local-first para el desarrollo spec-driven." -ForegroundColor DarkGray
     Write-Host ""
 }
 
 # ============================================================================
-# Platform detection
+# Detección de Plataforma
 # ============================================================================
 
 function Get-Platform {
@@ -86,24 +91,25 @@ function Get-Platform {
 }
 
 # ============================================================================
-# Prerequisites
+# Requisitos Previos
 # ============================================================================
 
 function Test-Prerequisites {
     Write-Step "Checking prerequisites"
 
     $missing = @()
-    if (-not (Get-Command "git" -ErrorAction SilentlyContinue)) { $missing += "git" }
+    if (-not (Get-Command "curl" -ErrorAction SilentlyContinue)) { $missing += "curl" }
+    if (-not (Get-Command "git" -ErrorAction SilentlyContinue))  { $missing += "git" }
 
     if ($missing.Count -gt 0) {
         Stop-WithError "Missing required tools: $($missing -join ', '). Please install them and try again."
     }
 
-    Write-Success "git is available"
+    Write-Success "curl and git are available"
 }
 
 # ============================================================================
-# Install method detection
+# Selección de Método de Instalación
 # ============================================================================
 
 function Get-InstallMethod {
@@ -114,16 +120,21 @@ function Get-InstallMethod {
         return $Forced
     }
 
-    Write-Info "Will use binary with source fallback"
+    Write-Step "Detecting best install method"
+    Write-Info "Will download pre-built binary from GitHub Releases"
     return "binary"
 }
 
 # ============================================================================
-# Install via go install
+# Instalación vía Go
 # ============================================================================
 
 function Install-ViaGo {
     Write-Step "Installing via go install"
+
+    if (-not (Get-Command "go" -ErrorAction SilentlyContinue)) {
+        Stop-WithError "Go is required for this method. Install Go from https://go.dev/dl/"
+    }
 
     $goPackage = "github.com/$($GITHUB_OWNER.ToLower())/$GITHUB_REPO/cmd/$BINARY_NAME@latest"
     Write-Info "Running: go install $goPackage"
@@ -148,7 +159,7 @@ function Install-ViaGo {
 }
 
 # ============================================================================
-# Install via binary download
+# Obtener última versión
 # ============================================================================
 
 function Get-LatestVersion {
@@ -157,26 +168,23 @@ function Get-LatestVersion {
     $url = "https://api.github.com/repos/$GITHUB_OWNER/$GITHUB_REPO/releases/latest"
 
     try {
-        $response = Invoke-RestMethod -Uri $url -Headers @{ "User-Agent" = "odin-installer" } -TimeoutSec 15 -ErrorAction Stop
+        $response = Invoke-RestMethod -Uri $url -Headers @{ "User-Agent" = "odin-installer" }
     } catch {
-        Write-Warn "Could not fetch release: $($_.Exception.Message)"
-        return $null
-    }
-
-    if (-not $response) {
-        Write-Warn "Empty response from GitHub"
-        return $null
+        Stop-WithError "No se pudo obtener la última release de GitHub.`nMOTIVO: Es posible que aún no existan releases públicas en $GITHUB_OWNER/$GITHUB_REPO.`nRECOMENDACIÓN: Instala usando Go: irm ... | iex -Method go"
     }
 
     $version = $response.tag_name
     if (-not $version) {
-        Write-Warn "No tag_name in response"
-        return $null
+        Stop-WithError "Could not determine latest version from GitHub API response"
     }
 
     Write-Success "Latest version: $version"
     return $version
 }
+
+# ============================================================================
+# Instalación de Binario
+# ============================================================================
 
 function Install-ViaBinary {
     param([string]$Arch)
@@ -184,13 +192,6 @@ function Install-ViaBinary {
     Write-Step "Installing pre-built binary"
 
     $version = Get-LatestVersion
-
-    if (-not $version) {
-        Write-Warn "No GitHub release found. Building from source..."
-        Install-ViaSource
-        return
-    }
-
     $versionNumber = $version.TrimStart("v")
 
     $archiveName = "${BINARY_NAME}_${versionNumber}_windows_${Arch}.zip"
@@ -201,18 +202,18 @@ function Install-ViaBinary {
     New-Item -ItemType Directory -Path $tmpDir -Force | Out-Null
 
     try {
+        # Descarga
         Write-Info "Downloading $archiveName..."
         $archivePath = Join-Path $tmpDir $archiveName
-        Invoke-WebRequest -Uri $downloadUrl -OutFile $archivePath -UseBasicParsing -TimeoutSec 60
+        Invoke-WebRequest -Uri $downloadUrl -OutFile $archivePath -UseBasicParsing
 
         $fileSize = (Get-Item $archivePath).Length
         if ($fileSize -lt 1000) {
-            Write-Warn "Downloaded file too small. Building from source..."
-            Install-ViaSource
-            return
+            Stop-WithError "Downloaded file is suspiciously small ($fileSize bytes). Archive may not exist for this platform."
         }
         Write-Success "Downloaded $archiveName ($fileSize bytes)"
 
+        # Verificación de Checksum
         Write-Info "Verifying checksum..."
         try {
             $checksumsPath = Join-Path $tmpDir "checksums.txt"
@@ -225,9 +226,7 @@ function Install-ViaBinary {
                 $actualChecksum = (Get-FileHash -Path $archivePath -Algorithm SHA256).Hash.ToLower()
 
                 if ($actualChecksum -ne $expectedChecksum) {
-                    Write-Warn "Checksum mismatch. Building from source..."
-                    Install-ViaSource
-                    return
+                    Stop-WithError "Checksum mismatch!`n  Expected: $expectedChecksum`n  Got:      $actualChecksum"
                 }
                 Write-Success "Checksum verified"
             } else {
@@ -237,19 +236,16 @@ function Install-ViaBinary {
             Write-Warn "Could not download checksums.txt - skipping verification"
         }
 
+        # Extracción
         Write-Info "Extracting $BINARY_NAME..."
         Expand-Archive -Path $archivePath -DestinationPath $tmpDir -Force
 
         $binaryPath = Join-Path $tmpDir "$BINARY_NAME.exe"
         if (-not (Test-Path $binaryPath)) {
-            $binaryPath = Join-Path $tmpDir "bin\$BINARY_NAME.exe"
-        }
-        if (-not (Test-Path $binaryPath)) {
-            Write-Warn "Binary not found in archive. Building from source..."
-            Install-ViaSource
-            return
+            Stop-WithError "Binary '$BINARY_NAME.exe' not found in archive"
         }
 
+        # Directorio de instalación
         $installDir = $InstallDir
         if (-not $installDir) {
             $installDir = Join-Path $env:LOCALAPPDATA "odin\bin"
@@ -259,12 +255,14 @@ function Install-ViaBinary {
             New-Item -ItemType Directory -Path $installDir -Force | Out-Null
         }
 
+        # Instalar
         $destPath = Join-Path $installDir "$BINARY_NAME.exe"
         Write-Info "Installing to $destPath..."
         Copy-Item -Path $binaryPath -Destination $destPath -Force
 
         Write-Success "Installed $BINARY_NAME to $destPath"
 
+        # Actualizar PATH
         if ($env:PATH -notlike "*$installDir*") {
             Write-Warn "$installDir is not in your PATH"
             Write-Host ""
@@ -277,46 +275,14 @@ function Install-ViaBinary {
     }
 }
 
-function Install-ViaSource {
-    Write-Step "Building from source"
-
-    if (-not (Get-Command "go" -ErrorAction SilentlyContinue)) {
-        Stop-WithError "Go is required to build from source. Install Go from https://go.dev/dl/"
-    }
-
-    $INSTALL_ROOT = Join-Path $HOME ".odin"
-    $INSTALL_BIN = Join-Path $INSTALL_ROOT "bin"
-
-    if (-not (Test-Path $INSTALL_BIN)) {
-        New-Item -ItemType Directory -Path $INSTALL_BIN -Force | Out-Null
-    }
-
-    $sourcePath = "./cmd/odin"
-    $binaryPath = Join-Path $INSTALL_BIN "$BINARY_NAME.exe"
-
-    Write-Info "Compiling..."
-    & go build -o $binaryPath $sourcePath
-    if ($LASTEXITCODE -ne 0) {
-        Stop-WithError "Failed to compile ODIN. Check that source exists at $sourcePath"
-    }
-
-    Write-Success "Binary compiled and installed at $binaryPath"
-
-    if ($env:PATH -notlike "*$INSTALL_BIN*") {
-        $userPath = [Environment]::GetEnvironmentVariable("PATH", "User")
-        $newPath = "$userPath;$INSTALL_BIN"
-        [Environment]::SetEnvironmentVariable("PATH", $newPath, "User")
-        Write-Warn "Added $INSTALL_BIN to PATH. Restart your terminal."
-    }
-}
-
 # ============================================================================
-# Verify installation
+# Verificación final
 # ============================================================================
 
 function Test-Installation {
     Write-Step "Verifying installation"
 
+    # Refrescar PATH para la sesión actual
     $env:PATH = [Environment]::GetEnvironmentVariable("PATH", "Machine") + ";" + [Environment]::GetEnvironmentVariable("PATH", "User")
 
     $cmd = Get-Command $BINARY_NAME -ErrorAction SilentlyContinue
@@ -326,16 +292,9 @@ function Test-Installation {
         return
     }
 
-    $gopath = $null
-    if (Get-Command "go" -ErrorAction SilentlyContinue) {
-        $gopath = & go env GOPATH 2>$null
-    }
     $locations = @(
         (Join-Path $env:LOCALAPPDATA "odin\bin\$BINARY_NAME.exe")
     )
-    if ($gopath) {
-        $locations += (Join-Path $gopath "bin\$BINARY_NAME.exe")
-    }
 
     foreach ($loc in $locations) {
         if ($loc -and (Test-Path $loc)) {
@@ -350,7 +309,7 @@ function Test-Installation {
 }
 
 # ============================================================================
-# Next steps
+# Próximos pasos
 # ============================================================================
 
 function Show-NextSteps {

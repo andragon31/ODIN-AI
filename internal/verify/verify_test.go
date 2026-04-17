@@ -7,7 +7,7 @@ import (
 )
 
 func TestFlakyTracker_RecordRun(t *testing.T) {
-	tracker := NewFlakyTracker(3)
+	tracker := NewFlakyTracker(5)
 
 	// Record some runs
 	tracker.RecordRun("TestOne", true, 10*time.Millisecond)

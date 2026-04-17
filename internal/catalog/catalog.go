@@ -31,6 +31,9 @@ type Agent struct {
 	Description string   `json:"description"`
 	Website     string   `json:"website"`
 	SupportedOS []string `json:"supported_os"`
+	BinaryName  string   `json:"binary_name"`
+	IsInstalled bool     `json:"is_installed"`
+	Version     string   `json:"version"`
 }
 
 // Component represents an installable component in the ODIN ecosystem
@@ -68,6 +71,7 @@ func KnownAgents() []Agent {
 			Description: "Anthropic's CLI tool for Claude AI coding assistance",
 			Website:     "https://docs.anthropic.com/en/docs/claude-code",
 			SupportedOS: []string{"linux", "darwin", "windows"},
+			BinaryName:  "claude",
 		},
 		{
 			ID:          AgentGeminiCLI,
@@ -75,6 +79,7 @@ func KnownAgents() []Agent {
 			Description: "Google's CLI tool for Gemini AI assistance",
 			Website:     "https://ai.google.dev/gemini-api/docs",
 			SupportedOS: []string{"linux", "darwin", "windows"},
+			BinaryName:  "gemini",
 		},
 		{
 			ID:          AgentOpenCode,
@@ -82,6 +87,7 @@ func KnownAgents() []Agent {
 			Description: "Open source AI coding agent",
 			Website:     "https://github.com/opencode-ai/opencode",
 			SupportedOS: []string{"linux", "darwin", "windows"},
+			BinaryName:  "opencode",
 		},
 		{
 			ID:          AgentCodex,
@@ -89,6 +95,7 @@ func KnownAgents() []Agent {
 			Description: "OpenAI's AI coding assistant",
 			Website:     "https://platform.openai.com/docs/guides/code",
 			SupportedOS: []string{"linux", "darwin", "windows"},
+			BinaryName:  "codex",
 		},
 		{
 			ID:          AgentCursor,
@@ -96,6 +103,7 @@ func KnownAgents() []Agent {
 			Description: "AI-first code editor",
 			Website:     "https://cursor.sh",
 			SupportedOS: []string{"linux", "darwin", "windows"},
+			BinaryName:  "cursor",
 		},
 		{
 			ID:          AgentWindsurf,
@@ -103,6 +111,7 @@ func KnownAgents() []Agent {
 			Description: "Codeium's AI coding agent",
 			Website:     "https://codeium.com/windsurf",
 			SupportedOS: []string{"linux", "darwin", "windows"},
+			BinaryName:  "windsurf",
 		},
 	}
 }
@@ -265,18 +274,10 @@ func (c *CatalogManager) ListByType(itemType CatalogType) interface{} {
 	}
 }
 
-// DetectInstalledAgents detects which AI agents are installed on the system
-func (c *CatalogManager) DetectInstalledAgents() []AgentID {
-	installed := []AgentID{}
-
-	agents := map[AgentID]string{
-		AgentClaudeCode: "claude",
-		AgentGeminiCLI:  "gemini",
-		AgentOpenCode:   "opencode",
-		AgentCodex:      "codex",
-		AgentCursor:     "cursor",
-		AgentWindsurf:   "windsurf",
-	}
+// DetectInstalledAgents detects which AI agents are installed on the system and returns full Agent info
+func (c *CatalogManager) DetectInstalledAgents() []Agent {
+	installed := []Agent{}
+	known := KnownAgents()
 
 	path := os.Getenv("PATH")
 	pathSeparator := ":"
@@ -286,16 +287,24 @@ func (c *CatalogManager) DetectInstalledAgents() []AgentID {
 
 	paths := strings.Split(path, pathSeparator)
 
-	for agentID, cmd := range agents {
+	for _, agent := range known {
+		cmd := agent.BinaryName
+		found := false
 		for _, p := range paths {
 			executable := filepath.Join(p, cmd)
 			if runtime.GOOS == "windows" {
 				executable = filepath.Join(p, cmd+".exe")
 			}
 			if _, err := os.Stat(executable); err == nil {
-				installed = append(installed, agentID)
+				agent.IsInstalled = true
+				// In a real scenario, we would run 'cmd --version' here
+				// For now, we'll mark it as found
+				found = true
 				break
 			}
+		}
+		if found {
+			installed = append(installed, agent)
 		}
 	}
 
