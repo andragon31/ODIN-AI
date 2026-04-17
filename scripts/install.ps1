@@ -29,7 +29,7 @@ param(
     [string]$InstallDir = ""
 )
 
-$ErrorActionPreference = "Stop"
+$ErrorActionPreference = "Continue"
 
 $GITHUB_OWNER = "andragon31"
 $GITHUB_REPO = "ODIN-AI"
@@ -157,13 +157,20 @@ function Get-LatestVersion {
     $url = "https://api.github.com/repos/$GITHUB_OWNER/$GITHUB_REPO/releases/latest"
 
     try {
-        $response = Invoke-RestMethod -Uri $url -Headers @{ "User-Agent" = "odin-installer" } -TimeoutSec 15
+        $response = Invoke-RestMethod -Uri $url -Headers @{ "User-Agent" = "odin-installer" } -TimeoutSec 15 -ErrorAction Stop
     } catch {
+        Write-Warn "Could not fetch release: $($_.Exception.Message)"
+        return $null
+    }
+
+    if (-not $response) {
+        Write-Warn "Empty response from GitHub"
         return $null
     }
 
     $version = $response.tag_name
     if (-not $version) {
+        Write-Warn "No tag_name in response"
         return $null
     }
 
